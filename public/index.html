@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-ui="taverna">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mesa Virtual</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Lora:wght@400;600&display=swap">
+<style>
+:root{--bg:#1b1410;--panel:#e6d3a3;--panel2:#f5e9c8;--ink:#3a2814;--mut:#7a6240;--line:#b08f55;--acc:#d9a441;--accink:#2a1a0c;--grid:rgba(255,235,190,.16);--board:#2b2119;--hd:#f0dfb4;--wood1:#5a3b1f;--wood2:#3a2412;--gold:#d9a441;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-ui="perg"]{--bg:#d8c291;--panel:#f1e3bd;--panel2:#fbf3dc;--ink:#3a2814;--mut:#7a6240;--line:#a98749;--acc:#8a4b1c;--accink:#fff5dc;--grid:rgba(60,40,20,.22);--board:#d9c897;--hd:#3a2814;--wood1:#8a5a2b;--wood2:#5c3a1a;--gold:#b8801f;color-scheme:light}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html{height:100%}
+body{margin:0;height:100%;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
+header{flex:none}
+header{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+h1{font-size:18px;margin:0;flex:1;white-space:nowrap}
+main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 340px;gap:12px;padding:12px}
+main.sem{grid-template-columns:1fr}main.sem aside{display:none}
+@media(max-width:860px){main{grid-template-columns:1fr;grid-template-rows:minmax(200px,46%) minmax(0,1fr);gap:8px;padding:8px}main.sem{grid-template-rows:minmax(0,1fr)}}
+#vp{overflow:auto;border:1px solid var(--line);border-radius:10px;height:100%;background:var(--board);touch-action:pan-x pan-y;position:relative}
+#stage{position:absolute;left:0;top:0;transform-origin:0 0}
+#board{position:relative;left:0;top:0}
+#map{position:absolute;inset:0;background-size:100% 100%;background-repeat:no-repeat}
+#grid{position:absolute;inset:0;pointer-events:none}
+.tk{position:absolute;cursor:grab;touch-action:none;user-select:none;color:#fff;font-size:11px;font-weight:600}
+.tk .sh{position:absolute;inset:0;background:#888 center/cover;border:3px solid var(--tc,var(--acc))}
+.tk.sel .sh{border-color:#3b8bd9}
+.tk .nm{position:absolute;left:50%;bottom:-3px;transform:translate(-50%,100%);background:rgba(0,0,0,.7);padding:0 5px;border-radius:6px;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.tk .hp{position:absolute;left:0;right:0;top:-10px;height:6px;background:#0007;border-radius:3px;overflow:hidden}
+.tk .hp b{display:block;height:100%}
+.tk.turn::before{content:"▼";position:absolute;left:50%;top:-26px;transform:translateX(-50%);color:#f1c40f;font-size:18px;z-index:2;text-shadow:0 0 3px #000}
+.tk.fig .sh{background:radial-gradient(ellipse at 50% 88%,rgba(0,0,0,.5),transparent 62%)!important;border:0;clip-path:none!important;border-radius:0!important}
+.tk .fg{position:absolute;left:50%;bottom:6%;transform:translateX(-50%);height:175%;max-width:300%;object-fit:contain;filter:drop-shadow(0 0 2px var(--tc,var(--acc))) drop-shadow(0 0 2px var(--tc,var(--acc)))}
+.tk.fig.sel .fg{filter:drop-shadow(0 0 2px #3b8bd9) drop-shadow(0 0 3px #3b8bd9)}
+
+/* ESTADO DE MORTO / CAÍDO */
+.tk.dead .sh, .tk.dead .fg{filter:grayscale(100%) brightness(0.4) !important;}
+.tk.dead .sh{border-color:#555 !important;}
+.tk.dead::after{content:"💀";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;z-index:3;text-shadow:0 0 4px #000;pointer-events:none;}
+
+#vpw{position:relative;min-height:0;height:100%}.pl{pointer-events:none!important;cursor:default}#vp.arm,#vp.arm *{cursor:crosshair!important}#zf{position:absolute;right:16px;bottom:16px;z-index:5;display:flex;gap:4px}#zf button{min-width:38px;opacity:.92}
+.stabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}.stabs button{flex:1;padding:6px 2px;font-size:12px;min-height:34px}.stabs button.on{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+aside{min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-right:2px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+label{display:block;font-size:12px;color:var(--mut);margin:6px 0 2px}
+label.ck{display:flex;gap:6px;align-items:center;color:var(--ink);font-size:14px;margin:4px 0}
+input,select,button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%;min-height:38px}
+input[type=text]{width:100%}input[type=number]{width:80px}
+button{cursor:pointer}button.p{background:var(--acc);color:var(--accink);border-color:var(--acc);font-weight:600}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.mut{color:var(--mut);font-size:12px}.hide{display:none!important}
+#st{font-size:12px;color:var(--mut)}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;position:sticky;top:0;z-index:3;background:var(--bg);padding-bottom:4px}.tabs button{flex:1;padding:6px 4px;font-size:13px;min-height:34px}.tabs button.on{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+.off{display:none!important}
+#chat{height:230px;overflow:auto;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px;margin-bottom:6px}
+#chat div{padding:3px 4px;border-bottom:1px solid var(--line)}#chat .cr{background:#2f8f4a44;font-weight:700}#chat .fu{background:#c9404044;font-weight:700}
+.ob{position:absolute;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;user-select:none;line-height:1;background-size:100% 100%;background-repeat:no-repeat;background-position:center}
+.ob.lk{cursor:default}.ob.sel{outline:2px dashed #3b8bd9}
+.pin{position:absolute;font-size:26px;cursor:pointer;transform:translate(-50%,-100%);user-select:none}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px}
+.grid2 button{padding:6px 2px;font-size:12px}.grid2 button b{display:block;font-size:24px;font-weight:400}
+.fld{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px dashed var(--line)}
+#nBody{min-height:150px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg)}
+#rl h2{margin-top:8px}
+
+/* ===== visual RPG medieval (Taverna / Pergaminho) ===== */
+body{color:var(--hd);font-family:Lora,Georgia,"Times New Roman",serif;background:radial-gradient(ellipse at 50% 0,rgba(255,200,120,.08),transparent 60%),var(--bg)}
+header{background:linear-gradient(var(--wood1),var(--wood2));border-bottom:3px solid #1b1008;box-shadow:0 2px 0 var(--gold),0 6px 14px rgba(0,0,0,.4);color:#f0dfb4}
+h1{font-family:Cinzel,Georgia,serif;font-size:19px;letter-spacing:.08em;color:#f6e7c1;text-shadow:0 1px 0 #000,0 0 8px rgba(217,164,65,.5)}
+#st{color:#cdb98e}
+header button{padding:6px 14px;min-height:32px}
+#vp{border:7px solid var(--wood1);border-radius:10px;box-shadow:0 0 0 2px #1b1008,inset 0 0 14px rgba(0,0,0,.55),0 4px 14px rgba(0,0,0,.45)}
+aside{scrollbar-color:#8a6a3a transparent}
+section{color:var(--ink);background:radial-gradient(ellipse at 15% 0,rgba(255,255,255,.28),transparent 55%),var(--panel);border:2px solid #8a6a3a;border-radius:5px 13px 6px 14px/11px 6px 12px 5px;box-shadow:0 2px 0 var(--wood2),inset 0 0 22px rgba(120,80,30,.22)}
+h2{font-family:Cinzel,Georgia,serif;font-size:13px;letter-spacing:.07em;text-transform:uppercase;text-align:center;color:#f0dfb4;margin:0 -2px 10px;padding:5px 16px;background:linear-gradient(var(--wood1),var(--wood2));clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%,0 50%)}
+label,.mut{color:var(--mut)}label.ck{color:var(--ink)}
+input,select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;box-shadow:inset 0 1px 3px rgba(90,60,20,.25)}
+button{clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);border:0;padding:8px 16px;color:#f6e7c1;font-weight:600;text-shadow:0 1px 0 rgba(0,0,0,.5);background:linear-gradient(#c28a4a,#8b5a2b 14%,#5c3a1a 86%,#3f2810)}
+button:hover{filter:brightness(1.13)}button:active{filter:brightness(.9)}
+button.p{color:#06323d;text-shadow:0 1px 0 rgba(255,255,255,.45);background:linear-gradient(#8fe9f9,#35b9d6 45%,#1d88a8)}
+button.g{color:#3a2400;text-shadow:0 1px 0 rgba(255,255,255,.4);background:linear-gradient(#ffe9a0,#e0b04a 45%,#a8741a)}
+.grid2 button{clip-path:polygon(6px 0,calc(100% - 6px) 0,100% 6px,100% calc(100% - 6px),calc(100% - 6px) 100%,6px 100%,0 calc(100% - 6px),0 6px);padding:6px 2px}
+#zf button{clip-path:none;border-radius:50%;width:40px;height:40px;padding:0;color:#3a2400;text-shadow:none;border:2px solid #7a5a1a;background:radial-gradient(#fbe08f,#c8962e)}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px 2px;padding:6px 4px 8px;background:linear-gradient(var(--wood2),#24170c);border:2px solid #1b1008;border-radius:8px;box-shadow:0 2px 0 var(--gold)}
+.tabs button,.tabs button.on{clip-path:none;background:none;border:0;padding:0;min-height:0;display:flex;flex-direction:column;align-items:center;gap:7px;font:600 10px Cinzel,Georgia,serif;color:#f0dfb4;text-shadow:none}
+.tabs .ico{width:28px;height:28px;margin-top:5px;transform:rotate(45deg);background:linear-gradient(135deg,#8b5a2b,#4a2f16);border:2px solid #d9a441;border-radius:4px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px #1b1008}
+.tabs .ico i{transform:rotate(-45deg);font-style:normal;font-size:14px;line-height:1}
+.tabs button.on{color:#ffe28a}.tabs button.on .ico{background:linear-gradient(135deg,#ffe28a,#d9a441);box-shadow:0 0 10px rgba(255,214,102,.85)}
+.stabs button{padding:6px 8px;font-size:12px;min-height:32px;clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,8px 100%,0 50%)}
+.stabs button.on{color:#3a2400;text-shadow:0 1px 0 rgba(255,255,255,.4);border:0;background:linear-gradient(#ffe28a,#d9a441 50%,#a8741a)}
+#chat,#nBody{background:var(--panel2);color:var(--ink);border-color:var(--line)}
+#pbar{display:flex;gap:10px;align-items:center;margin:0 0 10px;padding:8px;background:linear-gradient(#4a3320,#2f2012);border:2px solid #7a5a2a;border-radius:6px;color:#f0dfb4}
+#pbImg{width:46px;height:46px;border-radius:6px;border:2px solid #d9a441;background:#555 center/cover;display:flex;align-items:center;justify-content:center;font-size:26px;flex:none}
+#pbTx{flex:1;min-width:0}#pbNm{display:block;font-family:Cinzel,Georgia,serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pbBar{position:relative;height:14px;margin-top:4px;background:#120b05;border:1px solid #6b4a24;border-radius:7px;overflow:hidden}
+#pbBar i{position:absolute;inset:0 auto 0 0;width:0}
+#pbBar span{position:absolute;inset:0;text-align:center;font-size:10px;line-height:14px;color:#fff;text-shadow:0 1px 1px #000}
+.pc{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+.pci{width:42px;height:42px;border-radius:50%;border:2px solid var(--gold);background:#777 center/cover;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.pct{flex:1;min-width:0;display:flex;flex-direction:column}.pct b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc button{padding:6px 10px;font-size:12px}
+.mhh{font-family:Cinzel,Georgia,serif;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);border-bottom:1px solid var(--line);margin:12px 0 6px;padding-bottom:2px}
+.mh button{padding:5px 10px;font-size:12px}.mh input[type=number]{width:70px}.mh .row{margin-bottom:4px}
+
+/* ===== ANIMAÇÃO DE DADOS 3D SOBRE O MAPA ===== */
+#diceOverlay{position:absolute;inset:0;pointer-events:none;z-index:99;overflow:hidden;perspective:1000px}
+.dice3d-group{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;gap:20px;flex-wrap:wrap;justify-content:center;align-items:center;width:80%;max-width:600px;opacity:1;transition:opacity 0.6s ease}
+.dice3d-group.fadeout{opacity:0}
+.dice3d{width:64px;height:64px;position:relative;transform-style:preserve-3d;animation:diceRoll 1.4s cubic-bezier(0.2, 0.8, 0.3, 1) forwards}
+.dice3d-face{position:absolute;width:64px;height:64px;background:linear-gradient(135deg, #e6d3a3, #d9a441);border:3px solid #3a2412;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:Cinzel,Georgia,serif;font-weight:bold;font-size:26px;color:#2a1a0c;box-shadow:inset 0 0 10px rgba(0,0,0,0.3), 0 4px 10px rgba(0,0,0,0.5)}
+.dice3d-banner{position:absolute;top:20%;left:50%;transform:translateX(-50%) scale(0.7);background:linear-gradient(var(--wood1),var(--wood2));border:3px solid var(--gold);padding:10px 24px;border-radius:30px;color:#f0dfb4;font-family:Cinzel,Georgia,serif;font-size:22px;box-shadow:0 6px 20px rgba(0,0,0,0.6);opacity:0;animation:bannerPop 0.5s 1.2s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);text-align:center;white-space:nowrap;z-index:100}
+.dice3d-banner .who{font-size:12px;display:block;color:#d9a441;text-transform:uppercase;letter-spacing:1px}
+.dice3d-banner.cr{border-color:#2f8f4a;color:#7be08f;text-shadow:0 0 10px #2f8f4a}
+.dice3d-banner.fu{border-color:#c94040;color:#ff8a7a;text-shadow:0 0 10px #c94040}
+@keyframes diceRoll{
+0%{transform:translate3d(calc(var(--rx) * -1px), calc(var(--ry) * -1px), 400px) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(0.3)}
+50%{transform:translate3d(calc(var(--rx) * 0.5px), calc(var(--ry) * 0.5px), 150px) rotateX(720deg) rotateY(540deg) rotateZ(360deg) scale(1.2)}
+100%{transform:translate3d(0, 0, 0) rotateX(1080deg) rotateY(1080deg) rotateZ(720deg) scale(1)}
+}
+@keyframes bannerPop{
+0%{opacity:0;transform:translateX(-50%) scale(0.5)}
+100%{opacity:1;transform:translateX(-50%) scale(1)}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>🎲 Mesa Virtual</h1>
+<span id="st"></span>
+<button id="bPanel" title="Mostrar ou ocultar o painel">☰ Painel</button>
+<button id="bTema" title="Alternar tema">🌓</button>
+</header>
+<main id="main">
+<div id="vpw">
+  <div id="zf"><button id="zfm" title="Menos zoom">−</button><button id="zfp" title="Mais zoom">+</button><button id="zff" title="Ajustar à tela">⤢</button></div>
+  <div id="vp">
+    <div id="stage">
+      <div id="board">
+        <div id="map"></div>
+        <div id="grid"></div>
+        <div id="diceOverlay"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<aside>
+<div class="tabs"><button data-tab="mesa"><span class="ico"><i>🗺️</i></span>Mesa</button><button data-tab="chat"><span class="ico"><i>💬</i></span>Chat</button><button data-tab="rolagens"><span class="ico"><i>🎲</i></span>Rolagens</button><button data-tab="fichas"><span class="ico"><i>📜</i></span>Fichas</button><button data-tab="cenario"><span class="ico"><i>🌲</i></span>Cenário</button><button data-tab="notas"><span class="ico"><i>📖</i></span>Notas</button><button data-tab="turnos"><span class="ico"><i>⚔️</i></span>Turnos</button><button data-tab="calc"><span class="ico"><i>🧮</i></span>Calc</button><button data-tab="pers"><span class="ico"><i>🧙</i></span>Elenco</button></div>
+<section data-t="mesa"><h2>Cenários (Até 4)</h2>
+<div class="stabs" id="sceneTabs">
+  <button data-scene="0" class="on">Cenário 1</button>
+  <button data-scene="1">Cenário 2</button>
+  <button data-scene="2">Cenário 3</button>
+  <button data-scene="3">Cenário 4</button>
+</div>
+<div class="row" style="margin-top:6px"><input type="text" id="sceneNameInput" placeholder="Nome do Cenário (ex: Taverna)" style="flex:1"><button id="bRenameScene" class="p">Renomear</button></div>
+<p class="mut">Cada cenário guarda seu próprio mapa de fundo e seus objetos de cenário de forma independente!</p>
+</section>
+<section data-t="mesa"><h2>Mesa</h2>
+<div class="row"><button id="bMap">Importar mapa</button><button id="bNew" class="p">+ Token</button></div>
+<div class="row" style="margin-top:8px"><button id="bZm">−</button><span id="zl" class="mut">100%</span><button id="bZp">+</button><button id="bZ1">100%</button></div>
+<label class="ck"><input type="checkbox" id="snap" checked> Alinhar à grade</label>
+<label class="ck"><input type="checkbox" id="showg" checked> Mostrar grade</label>
+<label>Tamanho da casa (px)</label><input type="number" id="gsz" min="20" max="200" value="50">
+<input type="file" id="fMap" accept="image/*" class="hide">
+<p class="mut"><b>Atalhos:</b> setas = mover · Delete = excluir · Esc = desmarcar · + − 0 = zoom · F = ajustar à tela · N = próximo turno · R = girar objeto · Ctrl+D = duplicar · / = chat</p></section>
+
+<section data-t="mesa"><h2>Camadas</h2><div id="camBox"></div><p class="mut">Oculte (👁) ou trave (🔒) cada camada. Objetos e carimbos escolhem a camada na aba Cenário; os tokens ficam na camada Tokens.</p></section>
+<section data-t="mesa" id="edit" class="hide"><h2>Token selecionado</h2>
+<div id="pbar"><div id="pbImg"></div><div id="pbTx"><b id="pbNm"></b><div id="pbBar"><i></i><span id="pbHp"></span></div></div></div>
+<label>Nome</label><input type="text" id="tName">
+<label>Tamanho (casas, 1 a 6)</label><input type="number" id="tSize" min="1" max="6" value="1">
+<label class="ck"><input type="checkbox" id="tDead"> 💀 Marcar como Morto / Caído</label>
+<label>Forma e cor da borda</label><div class="row"><select id="tForma"><option value="circulo">Redondo</option><option value="quadrado">Quadrado</option><option value="arredondado">Arredondado</option><option value="hex">Hexágono</option><option value="losango">Losango</option></select><input type="color" id="tCor" value="#8a3b12"></div>
+<div class="row" style="margin-top:6px"><button id="bFig">Corpo inteiro (PNG)</button><button id="bNoFig">Remover</button></div><input type="file" id="fFig" accept="image/*" class="hide">
+<img id="figPrev" class="hide" alt="" style="max-height:170px;display:block;margin:8px auto;filter:drop-shadow(0 0 2px var(--acc)) drop-shadow(0 0 2px var(--acc))">
+<label>Ficha vinculada</label><select id="tSheet"></select>
+<label>Vida (atual / máxima)</label><div class="row"><input type="number" id="tPv"><span>/</span><input type="number" id="tPvm"></div>
+<div class="row" style="margin-top:8px"><button id="bImg">Imagem</button><button id="bNoImg">Remover imagem</button><button id="bDel">Excluir</button></div>
+<input type="file" id="fImg" accept="image/*" class="hide"></section>
+
+<section data-t="mesa"><h2>Arquivo</h2>
+<div class="row"><button id="bSave" class="p">Salvar mesa</button><button id="bLoad">Carregar mesa</button><button id="bClear">Nova mesa</button></div>
+<input type="file" id="fLoad" accept=".json,application/json" class="hide">
+<p class="mut">Salva tudo (os 4 cenários, tokens, objetos, fichas, rolagens, chat e notas) em um arquivo .json. A mesa também é guardada automaticamente neste navegador.</p></section>
+
+<section data-t="chat"><h2>Chat e histórico</h2>
+<div id="chat"></div>
+<div class="row"><input type="text" id="msg" placeholder="Mensagem ou /r 2d6+3" style="flex:1;width:auto"><button id="bSend" class="p">Enviar</button></div>
+<label>Quem fala</label><input type="text" id="quem" value="Mestre">
+<label>Rolar dados (quantidade, tipo, modificador)</label>
+<div class="row"><input type="number" id="dQ" value="1" min="1" max="100"><span>d</span><input type="number" id="dL" value="20" min="2" max="1000" list="dls"><span>+</span><input type="number" id="dM" value="0"></div>
+<datalist id="dls"><option value="2"><option value="4"><option value="6"><option value="8"><option value="10"><option value="12"><option value="20"><option value="100"></datalist>
+<div class="row" style="margin-top:6px"><input type="number" id="cQ" value="1" min="1" max="20" title="Quantidade de moedas"><button id="bCoin" class="g">🪙 Jogar moeda</button></div>
+<div class="row" style="margin-top:6px"><select id="adv"><option value="0">Normal</option><option value="1">Vantagem</option><option value="-1">Desvantagem</option></select><button id="bRoll" class="p">Rolar</button><button id="bLogC">Limpar histórico</button></div></section>
+
+<section data-t="rolagens"><h2>Sistema de jogo</h2>
+<select id="sys"></select><p class="mut" id="sysT"></p>
+<div class="row" id="quick"></div>
+<div class="row" style="margin-top:8px"><button id="bSys">Importar sistema (.json)</button></div>
+<input type="file" id="fSys" accept=".json,application/json" class="hide">
+<p class="mut">Formato: {"nome":"X","dados":[[1,20],[2,6]],"padrao":[1,20],"regra":"texto","sucesso":6}</p></section>
+<section data-t="rolagens"><h2>Rolagens salvas</h2>
+<div id="rl"></div>
+<label>Nova rolagem</label><input type="text" id="rNome" placeholder="Nome (ex.: Espada longa)">
+<div class="row" style="margin-top:6px"><select id="rCat"><option>Testes</option><option>Ataques</option><option>Ações</option><option>Magias</option></select><input type="text" id="rD" value="1d20" style="width:90px" title="Dado"><input type="text" id="rAt" placeholder="Atributo" style="width:90px"></div>
+<div class="row" style="margin-top:6px"><input type="text" id="rDn" placeholder="Dano (ex.: 1d8+3)" style="width:140px"><select id="rAdv"><option value="0">Normal</option><option value="1">Vantagem</option><option value="-1">Desvantagem</option></select></div>
+<div class="row" style="margin-top:6px"><button id="rAdd" class="p">Salvar rolagem</button></div>
+<p class="mut">Atributo: nome de um campo da ficha ativa (ex.: DES), somado ao dado. Com dano preenchido, o ataque rola acerto e dano.</p></section>
+
+<section data-t="fichas"><h2>Mouse House</h2>
+<div class="row"><button id="mhNova" class="p">+ Nova ficha</button><button id="mhGer" class="g">🎲 Gerar personagem</button></div>
+<label>Nível do personagem gerado</label><select id="gNiv"><option value="0">Sorteado (1d6)</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+<label class="ck"><input type="checkbox" id="gFis"> Simular rolagem física (1d10+1d4)</label>
+<label>Nome (opcional)</label><div class="row"><input type="text" id="gNome" style="flex:1;width:auto"><button id="gRnd">Nome aleatório</button></div>
+<p class="mut">O gerador sorteia atributos, antecedente, título, classe, raça, item e magia (para o Mago). Por padrão usa 1d14 uniforme nas tabelas de 7 opções.</p></section>
+<section data-t="fichas"><h2>Fichas</h2>
+<div class="row" style="margin-bottom:6px"><button id="bShSave" class="g" title="Salva a ficha atual na mesa internamente">💾 Salvar ficha</button><button id="bSh">Importar (.json)</button></div>
+<select id="fSel"></select><div id="fBox" style="margin-top:8px"></div>
+<div class="row" style="margin-top:8px"><button id="bShDel">Excluir ficha</button></div>
+<input type="file" id="fSh" accept=".json,application/json" class="hide">
+<p class="mut">Formato: {"nome":"Aria","atributos":{"FOR":14,"DES":16}}. Clique no valor para rolar o dado padrão mais o atributo. Vincule a ficha a um token na aba Mesa.</p></section>
+
+<section data-t="cenario"><h2>Objetos de cenário</h2>
+<div class="stabs" id="sub"><button data-sub="obj">Objetos</button><button data-sub="car">Carimbos</button><button data-sub="npc">NPCs</button><button data-sub="item">Itens</button><button data-sub="ini">Inimigos</button></div>
+<div class="grid2" id="lib"></div>
+<div class="grid2 hide" id="libX"></div>
+<div class="row hide" id="imX" style="margin-top:8px"><button id="bXImg">Importar imagem</button><span class="mut">Clique com o botão direito para remover da biblioteca.</span></div>
+<input type="file" id="fXImg" accept="image/*" class="hide">
+<div class="row" style="margin-top:8px"><button id="bOImg">Importar imagem como objeto</button></div>
+<input type="file" id="fOImg" accept="image/*" class="hide">
+<div id="oCtl" class="hide"><label>Camada</label><select id="oCam"><option value="fundo">Fundo</option><option value="cenario">Cenário</option><option value="tokens">Tokens</option></select><label>Modo de Preenchimento</label><select id="oRepeat"><option value="no-repeat">Esticar Imagem</option><option value="repeat">Repetir (Tile)</option></select><label>Largura × altura (casas)</label><div class="row"><input type="number" id="oW" min=".5" max="20" step=".5"><span>×</span><input type="number" id="oH" min=".5" max="20" step=".5"></div>
+<div class="row" style="margin-top:8px"><button id="oL">↺ 45°</button><button id="oR">↻ 45°</button><button id="oDup">Duplicar</button><button id="oDel">Excluir</button></div>
+<label class="ck"><input type="checkbox" id="oLock"> Travar objeto</label></div></section>
+
+<section data-t="notas"><h2>Notas</h2>
+<div class="row"><select id="nFil"></select><button id="nNew" class="p">+ Nota</button></div>
+<label class="ck"><input type="checkbox" id="nHide"> Ocultar notas privadas</label>
+<div id="nList" style="margin-top:6px"></div>
+<div id="nEd" class="hide"><label>Título</label><input type="text" id="nTit">
+<div class="row" style="margin-top:6px"><select id="nFol"></select><select id="nTok"></select></div>
+<label class="ck"><input type="checkbox" id="nPriv"> Nota privada (segredo do mestre)</label>
+<div class="row" style="margin:6px 0"><button id="nB"><b>B</b></button><label class="ck" style="margin:0">Texto <input type="color" id="nCor" value="#c0392b"></label><label class="ck" style="margin:0">Fundo <input type="color" id="nHi" value="#f1c40f"></label></div>
+<div id="nBody" contenteditable="true"></div>
+<div class="row" style="margin-top:6px"><button id="nPin">📌 Marcar no mapa</button><button id="nUnpin">Remover marca</button><button id="nDel">Excluir nota</button></div></div></section>
+<section data-t="turnos"><h2>Iniciativa e turnos</h2>
+<div class="stabs" id="subTurnos" style="margin-bottom:8px">
+  <button data-turnsub="ger" class="on">Gerenciar Turnos</button>
+  <button data-turnsub="comb">Ficha de Combate</button>
+</div>
+<div id="tsGer">
+  <div class="row"><b id="rod">Rodada 1</b><button id="iNext" class="p">Próximo turno ▶</button><button id="iRst">Reiniciar</button></div>
+  <div class="row" style="margin-top:8px"><button id="iAdd">+ Token selecionado</button><button id="iAll">+ Todos</button></div>
+  <label>Atributo de iniciativa (da ficha)</label>
+  <div class="row"><input type="text" id="iAt" value="DES" style="width:90px"><button id="iRoll">Rolar iniciativa</button><button id="iClr">Limpar</button></div>
+  <div id="iList" style="margin-top:8px"></div>
+  <p class="mut">Rola o dado padrão do sistema mais o atributo da ficha de cada token. Os valores podem ser editados à mão. O token da vez recebe um ▼ no mapa.</p>
+</div>
+<div id="tsComb" class="hide">
+  <label>Selecionar Token em Combate</label>
+  <select id="cCombSel"></select>
+  <div id="cCombBox" style="margin-top:8px"></div>
+</div>
+</section>
+<section data-t="calc"><h2>Calculadora</h2>
+<input type="text" id="cIn" placeholder="Ex.: (12+8)*2" inputmode="decimal">
+<div id="cRes" class="mut" style="margin:4px 0;min-height:18px"></div>
+<div class="grid2" id="cPad"></div>
+<div class="row" style="margin-top:8px"><button id="cLast">Último dado</button><button id="cAns">Ans</button><button id="cChat">→ Chat</button></div>
+<div class="row" style="margin-top:6px"><button id="cDmg">− Dano no token</button><button id="cHeal">+ Cura no token</button></div>
+<div id="cHist" class="mut" style="margin-top:6px"></div></section>
+<section data-t="pers"><h2>Biblioteca de personagens</h2>
+<div class="row"><select id="pFil"><option value="">Todos os grupos</option><option>Jogadores</option><option>NPCs</option><option>Inimigos</option></select><label class="ck" style="margin:0">Qtd <number" id="pQtd" value="1" min="1" max="20" style="width:64px"></label></div>
+<div id="pList" style="margin-top:8px"></div>
+<p class="mut">Cada cartão guarda imagem, forma, cor, tamanho, vida máxima e ficha. "+ Mapa" adiciona ao centro da tela; repetidos ganham número (Goblin 2, Goblin 3…).</p></section>
+<section data-t="pers"><h2>Salvar e importar</h2>
+<label>Grupo do novo personagem</label><select id="pGrp"><option>Jogadores</option><option>NPCs</option><option>Inimigos</option></select>
+<div class="row" style="margin-top:8px"><button id="pSave" class="p">Salvar token selecionado</button><button id="pImp">Importar imagem</button></div>
+<input type="file" id="fPImg" accept="image/*" class="hide">
+<div class="row" style="margin-top:8px"><button id="pExp">Exportar biblioteca</button><button id="pLoad">Importar biblioteca</button></div>
+<input type="file" id="fPLib" accept=".json,application/json" class="hide"></section>
+</aside>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const KEY="mesa-virtual-v1";
+const CORES=["#b5532a","#2f7d6d","#5a4fa8","#a8873a","#a83a5a"];
+
+// Estrutura de múltiplos cenários (4 cenários suportados)
+const defaultScene=()=>({nome:"Cenário",mapa:null,w:1400,h:900,objs:[]});
+const blank=()=>({versao:3,activeScene:0,scenes:[
+  {nome:"Cenário 1",mapa:null,w:1400,h:900,objs:[]},
+  {nome:"Cenário 2",mapa:null,w:1400,h:900,objs:[]},
+  {nome:"Cenário 3",mapa:null,w:1400,h:900,objs:[]},
+  {nome:"Cenário 4",mapa:null,w:1400,h:900,objs:[]}
+],grade:50,snap:true,mostrar:true,zoom:1,tokens:[],prox:1,log:[],rolls:[],fichas:[],sistemas:[],sis:"Mouse House",notas:[],pers:[],bib:{npc:[],item:[],ini:[]},ini:{lista:[],turno:0,rodada:1,at:"DES"},cam:{fundo:{v:true,t:false},cenario:{v:true,t:false},tokens:{v:true,t:false}}});
+
+let S=blank(),sel=null,timer=null;
+
+/* ---------- persistência ---------- */
+function status(t){$("st").textContent=t}
+function autosave(){clearTimeout(timer);timer=setTimeout(()=>{
+ try{localStorage.setItem(KEY,JSON.stringify(S));status("Salvo automaticamente ✓")}
+ catch(e){status("Sem salvamento automático (use Salvar mesa)")}},400)}
+function autoload(){try{const t=localStorage.getItem(KEY);if(t)apply(JSON.parse(t),true)}catch(e){}}
+
+function apply(j,quiet){
+ if(!j||!Array.isArray(j.tokens))throw new Error("formato");
+ S=Object.assign(blank(),j);
+ // Compatibilidade com versões antigas sem multi-cenários
+ if(!Array.isArray(S.scenes)){
+  S.scenes=[
+   {nome:"Cenário 1",mapa:S.mapa||null,w:S.w||1400,h:S.h||900,objs:Array.isArray(S.objs)?S.objs:[]},
+   {nome:"Cenário 2",mapa:null,w:1400,h:900,objs:[]},
+   {nome:"Cenário 3",mapa:null,w:1400,h:900,objs:[]},
+   {nome:"Cenário 4",mapa:null,w:1400,h:900,objs:[]}
+  ];
+  S.activeScene=0;
+ }
+ S.tokens=S.tokens.filter(t=>t&&typeof t==="object");
+ ["log","rolls","fichas","sistemas","notas","pers"].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});selO=selN=null;
+ if(!S.bib||typeof S.bib!=="object")S.bib={};["npc","item","ini"].forEach(k=>{if(!Array.isArray(S.bib[k]))S.bib[k]=[]});
+ if(!S.ini||!Array.isArray(S.ini.lista))S.ini={lista:[],turno:0,rodada:1,at:"DES"};
+ if(!S.cam||typeof S.cam!=="object")S.cam={};["fundo","cenario","tokens"].forEach(k=>{S.cam[k]=Object.assign({v:true,t:false},S.cam[k])});
+ sel=null;$("snap").checked=!!S.snap;$("showg").checked=!!S.mostrar;$("gsz").value=S.grade;
+ updateSceneTabs();
+ render();if(!quiet)autosave()}
+
+async function saveFile(){
+ const txt=JSON.stringify(S),name="mesa-"+new Date().toISOString().slice(0,10)+".json";
+ try{
+  if(window.claude&&claude.use){const d=await claude.use("downloads");if(d){await d.save({filename:name,data:txt});return}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"}));a.download=name;a.click();
+ }catch(e){if(!e||e.code!=="declined")status("Não foi possível salvar o arquivo aqui.")}}
+
+/* ---------- imagens ---------- */
+function shrink(file,max,square,cb){
+ const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{
+  const c=document.createElement("canvas"),g=c.getContext("2d");let w=im.naturalWidth,h=im.naturalHeight;
+  if(square){const s=Math.min(w,h);c.width=c.height=Math.min(max,s);g.drawImage(im,(w-s)/2,(h-s)/2,s,s,0,0,c.width,c.height);cb(c.toDataURL("image/png"),w,h)}
+  else{const k=Math.min(1,max/Math.max(w,h));c.width=Math.round(w*k);c.height=Math.round(h*k);g.drawImage(im,0,0,c.width,c.height);cb(c.toDataURL(file.type==="image/png"&&max<1000?"image/png":"image/jpeg",.85),c.width,c.height)}
+ };im.onerror=()=>status("Imagem inválida.");im.src=r.result};r.readAsDataURL(file)}
+
+/* ---------- desenho & cenários ---------- */
+const curScene=()=>S.scenes[S.activeScene]||S.scenes[0];
+
+function updateSceneTabs(){
+ const btns=document.querySelectorAll("#sceneTabs button");
+ btns.forEach((btn,idx)=>{
+  const sc=S.scenes[idx];
+  if(sc){
+   btn.textContent=sc.nome||("Cenário "+(idx+1));
+   btn.classList.toggle("on",idx===S.activeScene);
+  }
+ });
+ const cur=curScene();
+ $("sceneNameInput").value=cur.nome||"";
+}
+
+document.querySelectorAll("#sceneTabs button").forEach((btn,idx)=>{
+ btn.onclick=()=>{
+  S.activeScene=idx;
+  sel=selO=null;
+  updateSceneTabs();
+  render();
+  autosave();
+ };
+});
+
+$("bRenameScene").onclick=()=>{
+ const val=$("sceneNameInput").value.trim();
+ if(val){
+  curScene().nome=val;
+  updateSceneTabs();
+  autosave();
+  status("Cenário renomeado ✓");
+ }
+};
+
+function render(){
+ const z=S.zoom,g=S.grade,st=$("stage"),sc=curScene();
+ st.style.width=sc.w*z+"px";st.style.height=sc.h*z+"px";
+ st.style.transform="scale("+z+")";
+ $("map").style.backgroundImage=sc.mapa&&S.cam.fundo.v?"url("+sc.mapa+")":"none";
+ const gr=$("grid");gr.style.display=S.mostrar?"block":"none";
+ gr.style.backgroundImage="linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px)";
+ gr.style.backgroundSize=g+"px "+g+"px";
+ $("zl").textContent=Math.round(z*100)+"%";
+ const b=$("board");
+ b.style.width=sc.w+"px";b.style.height=sc.h+"px";
+ b.querySelectorAll(".tk,.ob,.pin").forEach(n=>n.remove());
+ layerObjs().forEach(o=>b.appendChild(objEl(o)));
+ if(S.cam.tokens.v)S.tokens.forEach(t=>b.appendChild(tokenEl(t)));
+ S.notas.forEach(n=>{if(n.pin&&!(n.priv&&$("nHide").checked))b.appendChild(pinEl(n))});
+ panel();ui()}
+
+const SHP={circulo:"border-radius:50%",quadrado:"border-radius:4px",arredondado:"border-radius:24%",hex:"clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%)",losango:"clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"};
+function tokenEl(t){
+ const el=document.createElement("div"),px=t.tam*S.grade-6,full=t.tam*S.grade,sc=curScene();
+ el.className="tk"+(t.id===sel?" sel":"")+(t.fig?" fig":"")+(S.ini.lista.length&&iniAtual()===t.id?" turn":"")+(t.dead?" dead":"")+(S.cam.tokens.t?" pl":"");
+ el.style.cssText="width:"+px+"px;height:"+px+"px;left:"+(t.x+3)+"px;top:"+(t.y+3)+"px"+(t.cor?";--tc:"+t.cor:"");
+ const sh=document.createElement("div");sh.className="sh";sh.style.cssText=SHP[t.forma]||SHP.circulo;
+ if(t.img)sh.style.backgroundImage="url("+t.img+")";else sh.style.backgroundColor=CORES[t.id%5];
+ if(t.ic){sh.textContent=t.ic;sh.style.cssText+=";display:flex;align-items:center;justify-content:center;font-size:"+px*.6+"px"}
+ el.appendChild(sh);
+ if(t.fig){const im=new Image();im.className="fg";im.src=t.fig;im.draggable=false;el.appendChild(im)}
+ const nm=document.createElement("span");nm.className="nm";nm.textContent=t.nome;el.appendChild(nm);
+ if(t.pvmax>0){const r=Math.max(0,Math.min(1,t.pv/t.pvmax)),hb=document.createElement("i"),f=document.createElement("b");hb.className="hp";
+  f.style.cssText="width:"+r*100+"%;background:"+(r>.5?"#3aa55d":r>.25?"#d6a31c":"#c94040");hb.appendChild(f);el.appendChild(hb)}
+ el.onpointerdown=e=>{
+  e.preventDefault();e.stopPropagation();el.setPointerCapture(e.pointerId);
+  const mx=e.clientX,my=e.clientY,ox=t.x,oy=t.y;let moved=false;
+  if(sel!==t.id){sel=t.id;selO=null;$("board").querySelectorAll(".tk,.ob").forEach(n=>n.classList.remove("sel"));el.classList.add("sel");panel();ui()}
+  el.onpointermove=ev=>{moved=true;
+   t.x=Math.max(0,Math.min(sc.w-full,ox+(ev.clientX-mx)/S.zoom));
+   t.y=Math.max(0,Math.min(sc.h-full,oy+(ev.clientY-my)/S.zoom));
+   el.style.left=t.x+3+"px";el.style.top=t.y+3+"px"};
+  el.onpointerup=()=>{el.onpointermove=el.onpointerup=null;
+   if(moved){if(S.snap){t.x=Math.min(sc.w-full,Math.round(t.x/S.grade)*S.grade);t.y=Math.min(sc.h-full,Math.round(t.y/S.grade)*S.grade);el.style.left=t.x+3+"px";el.style.top=t.y+3+"px"}autosave()}}};
+ return el}
+
+function panel(){
+ const t=S.tokens.find(x=>x.id===sel);$("edit").classList.toggle("hide",!t);
+ if(t){
+  if(document.activeElement!==$("tName"))$("tName").value=t.nome;
+  $("tSize").value=t.tam;
+  $("tDead").checked=!!t.dead;
+  tokExtra2();
+ }
+}
+const cur=()=>S.tokens.find(x=>x.id===sel);
+
+/* ---------- ações ---------- */
+function setZoom(z,ax,ay){const vp=$("vp"),r=S.zoom,R=vp.getBoundingClientRect();
+ const px=ax==null?vp.clientWidth/2:ax-R.left,py=ay==null?vp.clientHeight/2:ay-R.top;
+ const bx=(vp.scrollLeft+px)/r,by=(vp.scrollTop+py)/r;
+ S.zoom=Math.max(.25,Math.min(3,Math.round(z*100)/100));render();
+ vp.scrollLeft=bx*S.zoom-px;vp.scrollTop=by*S.zoom-py;autosave()}
+
+function fit(){const v=$("vp"),sc=curScene();setZoom(Math.min(v.clientWidth/sc.w,v.clientHeight/sc.h));v.scrollLeft=v.scrollTop=0}
+$("bZp").onclick=()=>setZoom(S.zoom+.25);$("bZm").onclick=()=>setZoom(S.zoom-.25);$("bZ1").onclick=()=>setZoom(1);
+$("vp").addEventListener("wheel",e=>{if(e.ctrlKey){e.preventDefault();setZoom(S.zoom*(e.deltaY<0?1.1:1/1.1),e.clientX,e.clientY)}},{passive:false});
+$("vp").onpointerdown=e=>{if(e.target.closest(".tk,.ob,.pin"))return;if(sel||selO){sel=selO=null;render()}};
+
+$("bMap").onclick=()=>$("fMap").click();
+$("fMap").onchange=e=>{const f=e.target.files[0];e.target.value="";
+ const sc=curScene();
+ if(f)shrink(f,2400,false,(u,w,h)=>{sc.mapa=u;sc.w=w;sc.h=h;render();autosave()})};
+
+$("bNew").onclick=()=>{const id=S.prox++,n=S.tokens.length,sc=curScene();
+ S.tokens.push({id,nome:"Token "+id,x:S.grade*(1+n%6),y:S.grade*(1+Math.floor(n/6)%6),tam:1,img:null,dead:false});sel=id;render();autosave()};
+
+$("tName").oninput=e=>{const t=cur();if(t){t.nome=e.target.value;render();autosave()}};
+$("tSize").onchange=e=>{const t=cur();const sc=curScene();if(t){t.tam=Math.min(6,Math.max(1,Math.round(+e.target.value)||1));
+ t.x=Math.min(t.x,sc.w-t.tam*S.grade);t.y=Math.min(t.y,sc.h-t.tam*S.grade);render();autosave()}};
+
+$("tDead").onchange=e=>{const t=cur();if(t){t.dead=e.target.checked;render();autosave()}};
+
+$("bImg").onclick=()=>$("fImg").click();
+$("fImg").onchange=e=>{const f=e.target.files[0],t=cur();e.target.value="";
+ if(f&&t)shrink(f,256,true,u=>{t.img=u;render();autosave()})};
+$("bNoImg").onclick=()=>{const t=cur();if(t){t.img=null;render();autosave()}};
+$("bDel").onclick=()=>{S.tokens=S.tokens.filter(x=>x.id!==sel);sel=null;render();autosave()};
+$("snap").onchange=e=>{S.snap=e.target.checked;autosave()};
+$("showg").onchange=e=>{S.mostrar=e.target.checked;render();autosave()};
+$("gsz").onchange=e=>{S.grade=Math.min(200,Math.max(20,Math.round(+e.target.value)||50));e.target.value=S.grade;render();autosave()};
+
+$("bSave").onclick=saveFile;
+$("bLoad").onclick=()=>$("fLoad").click();
+$("fLoad").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;
+ const r=new FileReader();r.onload=()=>{try{apply(JSON.parse(r.result));status("Mesa carregada ✓")}catch(err){status("Arquivo de mesa inválido.")}};r.readAsText(f)};
+$("bClear").onclick=()=>{if(confirm("Limpar a mesa atual e todos os cenários? Salve antes se quiser guardar.")){S=blank();sel=null;$("snap").checked=true;$("showg").checked=true;$("gsz").value=50;updateSceneTabs();render();autosave()}};
+$("bPanel").onclick=()=>$("main").classList.toggle("sem");
+$("bTema").onclick=()=>{const r=document.documentElement;r.dataset.ui=r.dataset.ui==="perg"?"taverna":"perg"};
+
+/* ===== ANIMAÇÃO DE DADOS 3D SOBRE O MAPA ===== */
+function trigger3DDice(rollData){
+ const ov=$("diceOverlay");
+ ov.innerHTML="";
+ const group=document.createElement("div");
+ group.className="dice3d-group";
+ 
+ const valList = rollData.a;
+ valList.forEach((val, idx)=>{
+  const d3d=document.createElement("div");
+  d3d.className="dice3d";
+  const rx=(Math.random()-0.5)*400;
+  const ry=(Math.random()-0.5)*400;
+  d3d.style.setProperty('--rx', rx);
+  d3d.style.setProperty('--ry', ry);
+  
+  const face=document.createElement("div");
+  face.className="dice3d-face";
+  face.textContent=val;
+  d3d.appendChild(face);
+  group.appendChild(d3d);
+ });
+ 
+ const banner=document.createElement("div");
+ banner.className="dice3d-banner"+(rollData.cr>0?" cr":rollData.cr<0?" fu":"");
+ const who=document.createElement("span");
+ who.className="who";
+ who.textContent=rollData.q + (rollData.rot ? " · "+rollData.rot : "");
+ banner.appendChild(who);
+ banner.appendChild(document.createTextNode("Total: "+rollData.tot));
+ group.appendChild(banner);
+ ov.appendChild(group);
+ 
+ setTimeout(()=>{
+  group.classList.add("fadeout");
+  setTimeout(()=>group.remove(), 600);
+ }, 3800);
+}
+
+/* ===== Fases 2 a 5 ===== */
+var selO=null,selN=null,fSel=null,rng=null;
+const CATS=["Testes","Ataques","Ações","Magias"],PASTAS=["Sessão","Personagens","Segredos do mestre"];
+const SYS=[{n:"Mouse House",d:[[1,10],[1,12],[1,8],[1,6]],p:[1,10],t:"d10: testes · d12: ataque · d8/d10/d12: dano · d6: modificador ou moeda. A ficha Mouse House fica na aba Fichas."},{n:"Genérico",d:[[1,20],[1,6],[2,6]],p:[1,20],t:"Rolagem livre."},
+{n:"D&D 5e",d:[[1,20],[1,12],[1,10],[1,8],[1,6],[1,4]],p:[1,20],t:"Testes: d20 + modificador."},
+{n:"Tormenta20",d:[[1,20],[1,12],[1,8],[1,6]],p:[1,20],t:"Testes: d20 + bônus."},
+{n:"Call of Cthulhu",d:[[1,100],[1,10],[1,6]],p:[1,100],t:"d100: igual ou abaixo da perícia."},
+{n:"Vampiro",d:[[5,10],[3,10],[1,10]],p:[1,10],s:6,t:"Reservas de d10; sucesso em 6 ou mais."}];
+const LIB=[["🌳","Árvore",2,2],["🌲","Pinheiro",2,2],["🌿","Arbusto",1,1],["🪨","Pedra",1,1],["🪵","Tronco",2,1],["📦","Caixa",1,1],["🛢️","Barril",1,1],["🏺","Jarra",1,1],["🪑","Cadeira",1,1],["🛏️","Cama",2,1],["🧱","Parede",3,1],["🚪","Porta",1,1],["🔥","Fogueira",1,1],["⛺","Tenda",3,3]];
+const allSys=()=>SYS.concat(S.sistemas),curSys=()=>allSys().find(x=>x.n===S.sis)||SYS[0];
+const sum=a=>a.reduce((x,y)=>x+y,0),quem=()=>$("quem").value.trim()||"Mestre";
+const el$=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+const ctr=()=>{const v=$("vp"),g=S.grade,sc=curScene();return{x:Math.max(0,Math.round(Math.min(sc.w-g,(v.scrollLeft+v.clientWidth/2)/S.zoom)/g)*g),y:Math.max(0,Math.round(Math.min(sc.h-g,(v.scrollTop+v.clientHeight/2)/S.zoom)/g)*g)}};
+const bonus=a=>{const f=S.fichas.find(x=>x.id==fSel),v=f&&f.campos[a];return typeof v==="number"?v:0};
+
+/* dados */
+function parse(e){const m=/^\s*(\d*)d(\d+)\s*([+-]\s*\d+)?\s*$/i.exec(e||"");return m?{c:Math.max(1,Math.min(100,+m[1]||1)),l:Math.max(2,Math.min(1000,+m[2])),m:+(m[3]||"0").replace(/\s/g,"")}:null}
+function doRoll(c,l,m,adv,rot){
+ const once=()=>Array.from({length:c},()=>1+Math.floor(Math.random()*l));let a=once(),b=null;
+ if(adv){b=once();const x=sum(a),y=sum(b);if((adv>0&&y>x)||(adv<0&&y<x))[a,b]=[b,a]}
+ const s=curSys(),r={k:"r",q:quem(),rot,e:c+"d"+l+(m?(m>0?"+":"")+m:"")+(adv?(adv>0?" vant.":" desv."):""),a,b,tot:sum(a)+m};
+ if(c===1&&l===20)r.cr=a[0]===20?1:a[0]===1?-1:0;
+ if(s.s)r.suc=a.filter(x=>x>=s.s).length;
+ trigger3DDice(r);
+ return r}
+function push(x){S.log.push(x);if(S.log.length>200)S.log.shift();drawLog();autosave()}
+function drawLog(){const c=$("chat");c.innerHTML="";S.log.forEach(x=>{const d=el$("div",x.cr>0?"cr":x.cr<0?"fu":"");
+ if(x.k==="m")d.append(el$("b",0,x.q+": "),document.createTextNode(x.txt));
+ else{let t=x.q+" · "+(x.rot?x.rot+" · ":"")+x.e+" ["+x.a.join(", ")+"]"+(x.b?" (descartado ["+x.b.join(", ")+"])":"")+" = "+x.tot;
+  if(x.suc!=null)t+=" · "+x.suc+" sucesso(s)";if(x.cr>0)t+=" · CRÍTICO!";if(x.cr<0)t+=" · FALHA CRÍTICA";d.textContent=t}
+ c.appendChild(d)});c.scrollTop=c.scrollHeight}
+function send(){const v=$("msg").value.trim();if(!v)return;$("msg").value="";
+ const mo=/^\/moeda(?:\s+(\d+))?$/i.exec(v);if(mo)return flip(+mo[1]||1);
+ if(v[0]==="/"){const m=/^\/r\s+(.+?)(?:\s+(vant|desv)\w*)?$/i.exec(v),p=m&&parse(m[1]);
+  if(!p)return push({k:"m",q:"Sistema",txt:"Use /r 2d6+3 (opcional: vant ou desv)."});
+  return push(doRoll(p.c,p.l,p.m,m[2]?(/^v/i.test(m[2])?1:-1):0,""))}
+ push({k:"m",q:quem(),txt:v})}
+$("bSend").onclick=send;$("msg").onkeydown=e=>{if(e.key==="Enter")send()};
+$("bRoll").onclick=()=>push(doRoll(Math.max(1,Math.min(100,+$("dQ").value||1)),Math.max(2,+$("dL").value||20),+$("dM").value||0,+$("adv").value,""));
+$("bLogC").onclick=()=>{S.log=[];drawLog();autosave()};
+
+/* sistemas e rolagens salvas */
+function sysUI(){const s=$("sys");s.innerHTML="";allSys().forEach(x=>s.appendChild(new Option(x.n,x.n)));s.value=curSys().n;$("sysT").textContent=curSys().t||"";
+ const q=$("quick");q.innerHTML="";curSys().d.forEach(([c,l])=>{const b=el$("button",0,c+"d"+l);b.onclick=()=>push(doRoll(c,l,0,0,""));q.appendChild(b)})}
+$("sys").onchange=e=>{S.sis=e.target.value;sysUI();autosave()};
+$("bSys").onclick=()=>$("fSys").click();
+$("fSys").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);
+ const d=(j.dados||[]).map(x=>Array.isArray(x)?x:[x.qtd||1,x.lados||20]);
+ const s={n:String(j.nome||f.name),d:d.length?d:[[1,20]],p:Array.isArray(j.padrao)?j.padrao:(d[0]||[1,20]),t:j.regra||j.nota||"",s:+j.sucesso||0};
+ S.sistemas=S.sistemas.filter(x=>x.n!==s.n);S.sistemas.push(s);S.sis=s.n;sysUI();autosave()}catch(err){status("Sistema inválido.")}};r.readAsText(f)};
+function runSaved(r){const p=parse(r.d);if(!p)return;const b=r.at?bonus(r.at):0;
+ push(doRoll(p.c,p.l,p.m+b,+r.adv||0,r.nome+(r.at?" ("+r.at+(b>=0?"+":"")+b+")":"")));
+ const q=parse(r.dn);if(q)push(doRoll(q.c,q.l,q.m,0,r.nome+" · dano"))}
+function rollsUI(){const box=$("rl");box.innerHTML="";
+ CATS.forEach(cat=>{const l=S.rolls.filter(r=>r.cat===cat);if(!l.length)return;box.appendChild(el$("h2",0,cat));
+  l.forEach(r=>{const row=el$("div","row"),b=el$("button","p",r.nome),x=el$("button",0,"×");row.style.marginBottom="4px";b.onclick=()=>runSaved(r);
+   x.onclick=()=>{S.rolls=S.rolls.filter(y=>y!==r);rollsUI();autosave()};
+   row.append(b,el$("span","mut",r.d+(r.at?"+"+r.at:"")+(r.dn?" / "+r.dn:"")+(+r.adv>0?" vant.":+r.adv<0?" desv.":"")),x);box.appendChild(row)})});
+ if(!S.rolls.length)box.appendChild(el$("p","mut","Nenhuma rolagem salva ainda."))}
+$("rAdd").onclick=()=>{const n=$("rNome").value.trim(),dn=$("rDn").value.trim();
+ if(!n||!parse($("rD").value))return status("Informe o nome e um dado válido, ex.: 1d20+5");
+ if(dn&&!parse(dn))return status("Dano inválido, ex.: 1d8+3");
+ S.rolls.push({id:S.prox++,nome:n,cat:$("rCat").value,d:$("rD").value.trim(),at:$("rAt").value.trim(),dn,adv:+$("rAdv").value});$("rNome").value="";rollsUI();autosave()};
+
+/* fichas, vida e salvamento interno */
+function fichaUI(){const s=$("fSel"),box=$("fBox");s.innerHTML="";s.appendChild(new Option("(nenhuma)",""));S.fichas.forEach(f=>s.appendChild(new Option(f.nome,f.id)));
+ const f=S.fichas.find(x=>x.id==fSel);s.value=f?f.id:"";box.innerHTML="";
+ box.classList.toggle("mh",!!(f&&f.mh));if(f&&f.mh){mhUI(f,box);return}
+ if(!f){box.appendChild(el$("p","mut","Nenhuma ficha ativa. Importe ou crie uma."));return}
+ Object.keys(f.campos).forEach(k=>{const v=f.campos[k],r=el$("div","fld"),b=el$("button",0,v);r.append(el$("span",0,k),b);
+  b.onclick=()=>{const p=curSys().p;push(doRoll(p[0],p[1],typeof v==="number"?v:0,0,f.nome+" · "+k))};box.appendChild(r)})}
+$("fSel").onchange=e=>{fSel=e.target.value;fichaUI()};
+$("bShSave").onclick=()=>{
+ const nomeFicha = prompt("Nome da nova ficha:", "Novo Personagem");
+ if(!nomeFicha) return;
+ const novaF = {id:S.prox++, nome: nomeFicha, campos: {"FOR": 10, "DES": 10, "CON": 10, "INT": 10}};
+ S.fichas.push(novaF);
+ fSel = novaF.id;
+ fichaUI();
+ autosave();
+ status("Ficha salva internamente ✓");
+};
+$("bSh").onclick=()=>$("fSh").click();
+$("fSh").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);let at=j.atributos||j.attributes;
+ if(!at){at={};Object.keys(j).forEach(k=>{if(typeof j[k]==="number")at[k]=j[k]})}
+ const sh={id:S.prox++,nome:String(j.nome||j.name||f.name.replace(/\.json$/i,"")),campos:at};S.fichas.push(sh);fSel=sh.id;const t=cur();if(t)t.ficha=sh.id;render();autosave()}catch(err){status("Ficha inválida.")}};r.readAsText(f)};
+$("bShDel").onclick=()=>{S.fichas=S.fichas.filter(x=>x.id!=fSel);S.tokens.forEach(t=>{if(t.ficha==fSel)t.ficha=null});fSel=null;render();autosave()};
+function tokExtra(){const t=cur(),s=$("tSheet");s.innerHTML="";s.appendChild(new Option("(nenhuma)",""));S.fichas.forEach(f=>s.appendChild(new Option(f.nome,f.id)));
+ if(t){s.value=t.ficha||"";if(document.activeElement!==$("tPv"))$("tPv").value=t.pv??"";if(document.activeElement!==$("tPvm"))$("tPvm").value=t.pvmax??"";if(t.ficha)fSel=t.ficha}}
+$("tSheet").onchange=e=>{const t=cur();if(t){t.ficha=+e.target.value||null;if(t.ficha)fSel=t.ficha;render();autosave()}};
+$("tPv").onchange=e=>{const t=cur();if(t){t.pv=e.target.value===""?null:+e.target.value;render();autosave()}};
+$("tPvm").onchange=e=>{const t=cur();if(t){t.pvmax=e.target.value===""?null:+e.target.value;if(t.pvmax>0&&t.pv==null)t.pv=t.pvmax;render();autosave()}};
+
+/* objetos de cenário atualizados para o cenário ativo */
+const co=()=>curScene().objs.find(x=>x.id===selO);
+function selectObj(o,el){sel=null;selO=o.id;$("board").querySelectorAll(".tk,.ob").forEach(n=>n.classList.remove("sel"));el.classList.add("sel");panel();objUI()}
+function objEl(o){const el=el$("div","ob"+(o.id===selO?" sel":"")+(o.trava?" lk":"")+(cm(o).t?" pl":"")),g=S.grade,sc=curScene();
+ el.style.cssText="left:"+o.x+"px;top:"+o.y+"px;width:"+o.w*g+"px;height:"+o.h*g+"px;transform:rotate("+(o.rot||0)+"deg);font-size:"+Math.min(o.w,o.h)*g*.8+"px";
+ el.style.backgroundRepeat=o.repeat||"no-repeat";
+ if(o.repeat==="repeat"){el.style.backgroundSize=g+"px "+g+"px"}else{el.style.backgroundSize="100% 100%"}
+ if(o.st)stampBg(el,o);else if(o.img)el.style.backgroundImage="url("+o.img+")";else el.textContent=o.ic;
+ el.onpointerdown=e=>{e.preventDefault();e.stopPropagation();el.setPointerCapture(e.pointerId);
+  const mx=e.clientX,my=e.clientY,ox=o.x,oy=o.y;let mv=false;if(selO!==o.id)selectObj(o,el);if(o.trava)return;
+  el.onpointermove=ev=>{mv=true;o.x=Math.max(0,Math.min(sc.w-g,ox+(ev.clientX-mx)/S.zoom));o.y=Math.max(0,Math.min(sc.h-g,oy+(ev.clientY-my)/S.zoom));el.style.left=o.x+"px";el.style.top=o.y+"px"};
+  el.onpointerup=()=>{el.onpointermove=el.onpointerup=null;if(mv){if(S.snap){o.x=Math.round(o.x/g)*g;o.y=Math.round(o.y/g)*g;el.style.left=o.x+"px";el.style.top=o.y+"px"}autosave()}}};
+ return el}
+
+function addObj(p){const c=ctr(),sc=curScene(),o=Object.assign({id:S.prox++,ic:"",img:null,repeat:"no-repeat",x:c.x,y:c.y,rot:0,trava:false},p);sc.objs.push(o);selO=o.id;sel=null;render();autosave()}
+LIB.forEach(([ic,n,w,h])=>{const b=el$("button");b.append(el$("b",0,ic),n);b.onclick=()=>addObj({ic,w,h});$("lib").appendChild(b)});
+$("bOImg").onclick=()=>$("fOImg").click();
+$("fOImg").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)shrink(f,512,false,(u,w,h)=>addObj({img:u,w:w>=h?2:2*w/h,h:h>w?2:2*h/w}))};
+function objUI(){const o=co();$("oCtl").classList.toggle("hide",!o);if(o){$("oW").value=+o.w.toFixed(2);$("oH").value=+o.h.toFixed(2);$("oLock").checked=!!o.trava;$("oCam").value=o.cam||"cenario";$("oRepeat").value=o.repeat||"no-repeat"}}
+$("oW").onchange=e=>{const o=co();if(o){o.w=Math.max(.5,Math.min(20,+e.target.value||1));render();autosave()}};
+$("oH").onchange=e=>{const o=co();if(o){o.h=Math.max(.5,Math.min(20,+e.target.value||1));render();autosave()}};
+$("oRepeat").onchange=e=>{const o=co();if(o){o.repeat=e.target.value;render();autosave()}};
+$("oL").onclick=()=>{const o=co();if(o){o.rot=((o.rot||0)+315)%360;render();autosave()}};
+$("oR").onclick=()=>{const o=co();if(o){o.rot=((o.rot||0)+45)%360;render();autosave()}};
+$("oDup").onclick=()=>{const o=co();const sc=curScene();if(o){const n=Object.assign({},o,{id:S.prox++,x:o.x+S.grade,y:o.y+S.grade});sc.objs.push(n);selO=n.id;render();autosave()}};
+$("oDel").onclick=()=>{const sc=curScene();sc.objs=sc.objs.filter(x=>x.id!==selO);selO=null;render();autosave()};
+$("oLock").onchange=e=>{const o=co();if(o){o.trava=e.target.checked;render();autosave()}};
+
+/* notas */
+function clean(h){const d=new DOMParser().parseFromString("<body>"+h+"</body>","text/html").body,OK=["B","I","U","SPAN","FONT","BR","DIV","P","STRONG","EM"];
+ (function w(n){[...n.childNodes].forEach(c=>{if(c.nodeType===3)return;if(c.nodeType!==1||!OK.includes(c.tagName)){c.replaceWith(document.createTextNode(c.textContent||""));return}
+  [...c.attributes].forEach(a=>{const ok=(a.name==="style"&&!/url|expression|@import/i.test(a.value))||(a.name==="color"&&/^[#\w]+$/.test(a.value));if(!ok)c.removeAttribute(a.name)});w(c)})})(d);return d.innerHTML}
+const cn=()=>S.notas.find(x=>x.id===selN);
+function notasUI(){const l=$("nList"),f=$("nFil").value;l.innerHTML="";
+ S.notas.filter(n=>(!f||n.pasta===f)&&!(n.priv&&$("nHide").checked)).forEach(n=>{const b=el$("button",n.id===selN?"p":"",(n.priv?"🔒 ":"")+(n.titulo||"Sem título")+" · "+n.pasta);
+  b.style.cssText="display:block;width:100%;text-align:left;margin-bottom:4px";b.onclick=()=>openNote(n.id);l.appendChild(b)});
+ $("nEd").classList.toggle("hide",!cn())}
+function openNote(id){selN=id;const n=cn();if(!n)return;$("nTit").value=n.titulo;$("nFol").value=n.pasta;$("nPriv").checked=!!n.priv;
+ const s=$("nTok");s.innerHTML="";s.appendChild(new Option("(sem vínculo a token)",""));S.tokens.forEach(t=>s.appendChild(new Option(t.nome,t.id)));s.value=n.tok||"";
+ $("nBody").innerHTML=clean(n.html||"");notasUI()}
+function pinEl(n){const e=el$("div","pin","📌");e.style.left=n.pin.x+"px";e.style.top=n.pin.y+"px";e.title=n.titulo;
+ e.onpointerdown=ev=>{ev.stopPropagation();setTab("notas");openNote(n.id)};return e}
+function fmt(c,v){const b=$("nBody");if(document.activeElement!==b){b.focus();if(rng){const s=getSelection();s.removeAllRanges();s.addRange(rng)}}
+ document.execCommand("styleWithCSS",false,true);document.execCommand(c,false,v);const n=cn();if(n){n.html=b.innerHTML;autosave()}}
+$("nBody").onblur=()=>{const s=getSelection();if(s.rangeCount)rng=s.getRangeAt(0).cloneRange()};
+$("nBody").oninput=()=>{const n=cn();if(n){n.html=$("nBody").innerHTML;autosave()}};
+$("nB").onmousedown=e=>{e.preventDefault();fmt("bold")};
+$("nCor").oninput=e=>fmt("foreColor",e.target.value);$("nHi").oninput=e=>fmt("hiliteColor",e.target.value);
+$("nTit").oninput=e=>{const n=cn();if(n){n.titulo=e.target.value;notasUI();autosave()}};
+$("nFol").onchange=e=>{const n=cn();if(n){n.pasta=e.target.value;notasUI();autosave()}};
+$("nPriv").onchange=e=>{const n=cn();if(n){n.priv=e.target.checked;render();autosave()}};
+$("nTok").onchange=e=>{const n=cn();if(n){n.tok=+e.target.value||null;autosave()}};
+$("nHide").onchange=render;$("nFil").onchange=notasUI;
+$("nNew").onclick=()=>{const n={id:S.prox++,titulo:"Nova nota",pasta:$("nFil").value||PASTAS[0],priv:false,html:"",tok:null,pin:null};S.notas.push(n);openNote(n.id);autosave()};
+$("nPin").onclick=()=>{const n=cn();if(n){const c=ctr();n.pin={x:c.x+S.grade/2,y:c.y+S.grade};render();autosave()}};
+$("nUnpin").onclick=()=>{const n=cn();if(n){n.pin=null;render();autosave()}};
+$("nDel").onclick=()=>{S.notas=S.notas.filter(x=>x.id!==selN);selN=null;render();autosave()};
+$("nFil").appendChild(new Option("Todas as pastas",""));PASTAS.forEach(p=>{$("nFil").appendChild(new Option(p,p));$("nFol").appendChild(new Option(p,p))});
+
+/* abas e interface */
+function setTab(t){document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));document.querySelectorAll("aside>section").forEach(s=>s.classList.toggle("off",s.dataset.t!==t))}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));setTab("mesa");
+var sub="obj",ans=0,hist=[];
+function flip(n){n=Math.max(1,Math.min(20,n||1));let c=0;for(let i=0;i<n;i++)if(Math.random()<.5)c++;
+ push({k:"m",q:"🪙 "+quem(),txt:n===1?(c?"Cara":"Coroa"):c+" cara(s), "+(n-c)+" coroa(s)"})}
+$("bCoin").onclick=()=>flip(+$("cQ").value||1);
+
+/* token: forma, cor, corpo inteiro */
+function tokExtra2(){const t=cur(),p=$("figPrev");if(!t){p.classList.add("hide");return}
+ pbarUpdate(t);$("tForma").value=t.forma||"circulo";$("tCor").value=t.cor||"#8a3b12";p.classList.toggle("hide",!t.fig);if(t.fig)p.src=t.fig}
+$("tForma").onchange=e=>{const t=cur();if(t){t.forma=e.target.value;render();autosave()}};
+$("tCor").onchange=e=>{const t=cur();if(t){t.cor=e.target.value;render();autosave()}};
+$("bFig").onclick=()=>$("fFig").click();
+$("fFig").onchange=e=>{const f=e.target.files[0],t=cur();e.target.value="";if(f&&t)shrink(f,600,false,u=>{t.fig=u;render();autosave()})};
+$("bNoFig").onclick=()=>{const t=cur();if(t){t.fig=null;render();autosave()}};
+
+/* iniciativa e turnos */
+function iniLista(){return S.ini.lista.filter(e=>S.tokens.some(t=>t.id===e.id))}
+function iniAtual(){const l=iniLista();return l.length?l[S.ini.turno%l.length].id:null}
+function iniSort(){const a=iniAtual();S.ini.lista=iniLista().sort((x,y)=>y.v-x.v);const i=S.ini.lista.findIndex(e=>e.id===a);S.ini.turno=i<0?0:i}
+function iniAdd(t){if(!S.ini.lista.some(e=>e.id===t.id))S.ini.lista.push({id:t.id,v:0})}
+function iniUI(){const box=$("iList");box.innerHTML="";$("rod").textContent="Rodada "+S.ini.rodada;
+ if(document.activeElement!==$("iAt"))$("iAt").value=S.ini.at||"";
+ const l=iniLista(),at=iniAtual();
+ l.forEach(e=>{const t=S.tokens.find(x=>x.id===e.id),r=el$("div","fld"),inp=document.createElement("input"),x=el$("button",0,"×");
+  if(e.id===at)r.style.fontWeight="700";inp.type="number";inp.value=e.v;inp.style.width="64px";
+  inp.onchange=()=>{e.v=+inp.value||0;iniSort();render();autosave()};
+  x.onclick=()=>{S.ini.lista=S.ini.lista.filter(y=>y!==e);render();autosave()};
+  r.append(el$("span",0,(e.id===at?"▶ ":"")+t.nome),inp,x);box.appendChild(r)});
+ if(!l.length)box.appendChild(el$("p","mut","Nenhum token na iniciativa."))}
+function nextTurn(){const l=iniLista();if(!l.length)return;S.ini.turno=(S.ini.turno%l.length+1)%l.length;if(S.ini.turno===0)S.ini.rodada++;
+ const t=S.tokens.find(x=>x.id===l[S.ini.turno].id);push({k:"m",q:"Turnos",txt:"Rodada "+S.ini.rodada+" · vez de "+t.nome});mhTurno(t);render();autosave()}
+$("iNext").onclick=nextTurn;
+$("iRst").onclick=()=>{S.ini.turno=0;S.ini.rodada=1;S.fichas.forEach(f=>{if(f.mh)mhCombate(f)});render();autosave()};
+$("iAdd").onclick=()=>{const t=cur();if(!t)return status("Selecione um token.");iniAdd(t);render();autosave()};
+$("iAll").onclick=()=>{S.tokens.forEach(iniAdd);render();autosave()};
+$("iClr").onclick=()=>{S.ini.lista=[];S.ini.turno=0;S.ini.rodada=1;render();autosave()};
+$("iRoll").onclick=()=>{S.ini.at=$("iAt").value.trim();const p=curSys().p;
+ iniLista().forEach(e=>{const t=S.tokens.find(x=>x.id===e.id),f=S.fichas.find(x=>x.id==t.ficha),v=f&&(f.mh?f.campos["Agilidade"]:f.campos[S.ini.at]),r=doRoll(f&&f.mh?1:p[0],f&&f.mh?10:p[1],typeof v==="number"?v:0,0,"Iniciativa");r.q=t.nome;e.v=r.tot;push(r)});
+ iniSort();S.ini.turno=0;render();autosave()};
+
+let turnSub="ger";
+document.querySelectorAll("#subTurnos button").forEach(b=>{
+ b.onclick=()=>{
+  turnSub=b.dataset.turnsub;
+  document.querySelectorAll("#subTurnos button").forEach(bt=>bt.classList.toggle("on",bt.dataset.turnsub===turnSub));
+  $("tsGer").classList.toggle("hide",turnSub!=="ger");
+  $("tsComb").classList.toggle("hide",turnSub!=="comb");
+  if(turnSub==="comb") combUI();
+ }
+});
+function combUI(){
+ const selEl=$("cCombSel"), box=$("cCombBox");
+ selEl.innerHTML="";
+ S.tokens.forEach(t=>selEl.appendChild(new Option(t.nome,t.id)));
+ if(!S.tokens.length){box.innerHTML="<p class='mut'>Nenhum token na mesa.</p>";return;}
+ if(!selEl.value && S.tokens.length) selEl.value = S.tokens[0].id;
+ selEl.onchange=()=>renderCombToken();
+ renderCombToken();
+}
+function renderCombToken(){
+ const box=$("cCombBox");box.innerHTML="";
+ const tid=+$("cCombSel").value;const t=S.tokens.find(x=>x.id===tid);
+ if(!t){box.innerHTML="<p class='mut'>Token não encontrado.</p>";return;}
+ const f=S.fichas.find(x=>x.id==t.ficha);
+ const r=el$("div","row");
+ r.append(el$("b",0,t.nome),el$("span","mut",t.pvmax?"PV: "+t.pv+"/"+t.pvmax:"Sem PV configurado"));
+ box.appendChild(r);
+ if(f && f.mh){
+  const mhWrap=el$("div","mh");
+  mhUI(f, mhWrap);
+  box.appendChild(mhWrap);
+ }else{
+  box.appendChild(el$("p","mut","Este token não possui ficha Mouse House vinculada. Vincule uma ficha na aba Mesa para gerenciar ações avançadas de combate aqui."));
+ }
+}
+$("cCombSel").onchange=renderCombToken;
+
+/* calculadora */
+function calc(s){s=s.replace(/×/g,"*").replace(/÷/g,"/").replace(/,/g,".");let i=0;
+ const ws=()=>{while(s[i]===" ")i++};
+ function num(){ws();const m=/^\d*\.?\d+/.exec(s.slice(i));if(m){i+=m[0].length;return +m[0]}
+  if(s[i]==="("){i++;const v=expr();ws();if(s[i]!==")")throw 0;i++;return v}
+  if(s[i]==="-"){i++;return -num()}throw 0}
+ function term(){let v=num();for(;;){ws();const c=s[i];if(c==="*"){i++;v*=num()}else if(c==="/"){i++;v/=num()}else return v}}
+ function expr(){let v=term();for(;;){ws();const c=s[i];if(c==="+"){i++;v+=term()}else if(c==="-"){i++;v-=term()}else return v}}
+ const v=expr();ws();if(i<s.length||!isFinite(v))throw 0;return Math.round(v*1e6)/1e6}
+function cev(){try{const r=calc($("cIn").value);$("cRes").textContent="= "+r;return r}catch(e){$("cRes").textContent="Expressão inválida";return null}}
+function doCalc(){const x=$("cIn").value,r=cev();if(r===null)return;ans=r;hist.unshift(x+" = "+r);hist=hist.slice(0,6);
+ const h=$("cHist");h.innerHTML="";hist.forEach(t=>h.appendChild(el$("div",0,t)));$("cIn").value=String(r)}
+function calcKey(k){const i=$("cIn");if(k==="C"){i.value="";$("cRes").textContent=""}else if(k==="⌫")i.value=i.value.slice(0,-1);else if(k==="=")doCalc();else i.value+=k}
+["7","8","9","÷","4","5","6","×","1","2","3","-","0",".","(",")","+","C","⌫","="].forEach(k=>{const b=el$("button",0,k);b.onclick=()=>calcKey(k);$("cPad").appendChild(b)});
+$("cIn").onkeydown=e=>{if(e.key==="Enter")doCalc()};
+$("cAns").onclick=()=>{$("cIn").value+=ans};
+$("cLast").onclick=()=>{const l=[...S.log].reverse().find(x=>x.k==="r");if(l)$("cIn").value+=l.tot};
+$("cChat").onclick=()=>{const r=cev();if(r!==null)push({k:"m",q:"Calculadora",txt:$("cIn").value+" = "+r})};
+function hpAdj(sg){const t=cur();if(!t)return status("Selecione um token.");const r=cev();if(r===null)return;
+ const d=sg*Math.abs(r),mx=t.pvmax>0?t.pvmax:Infinity,v=Math.max(0,Math.min(mx,(t.pv==null?(t.pvmax||0):t.pv)+d));t.pv=v;
+ push({k:"m",q:"Vida",txt:t.nome+": "+(d>=0?"+":"")+d+" → "+v+(t.pvmax>0?"/"+t.pvmax:"")});render();autosave()}
+$("cDmg").onclick=()=>hpAdj(-1);$("cHeal").onclick=()=>hpAdj(1);
+
+/* sub-abas */
+const BI={npc:[["🧙","Mago"],["🧝","Elfo"],["👨‍🌾","Aldeão"],["🧑‍🍳","Taverneiro"],["💂","Guarda"],["🧚","Fada"]],
+item:[["🗡️","Espada"],["🏹","Arco"],["🛡️","Escudo"],["🧪","Poção"],["📜","Pergaminho"],["💰","Tesouro"],["🗝️","Chave"],["💎","Gema"]],
+ini:[["🐺","Lobo"],["💀","Esqueleto"],["🧟","Zumbi"],["👹","Ogro"],["🕷️","Aranha"],["🐉","Dragão"],["👺","Goblin"],["🐀","Rato gigante"]]};
+function place(k,p){if(k==="item")return addObj({ic:p.ic||"",img:p.img||null,w:1,h:1});
+ const c=ctr(),id=S.prox++;S.tokens.push({id,nome:p.nome,x:c.x,y:c.y,tam:1,img:p.img||null,ic:p.ic||"",cor:k==="ini"?"#c94040":"#3b8bd9",forma:"circulo",pv:null,pvmax:null,dead:false});
+ sel=id;selO=null;render();autosave()}
+function subUI(){document.querySelectorAll("#sub button").forEach(b=>b.classList.toggle("on",b.dataset.sub===sub));
+ const o=sub==="obj";$("lib").classList.toggle("hide",!o);$("bOImg").parentElement.classList.toggle("hide",!o);$("libX").classList.toggle("hide",o);$("imX").classList.toggle("hide",o||sub==="car");
+ const g=$("libX");g.innerHTML="";if(o)return;
+ if(sub==="car"){stampsUI(g);return}
+ BI[sub].forEach(([ic,n])=>{const b=el$("button");b.append(el$("b",0,ic),n);b.onclick=()=>place(sub,{ic,nome:n});g.appendChild(b)});
+ S.pers.filter(p=>p.grupo===({npc:"NPCs",ini:"Inimigos"})[sub]).forEach(p=>{const b=el$("button"),d=el$("div");d.style.cssText="width:34px;height:34px;border-radius:50%;margin:0 auto;background:#777 center/cover;display:flex;align-items:center;justify-content:center;font-size:20px";
+  if(p.img)d.style.backgroundImage="url("+p.img+")";else d.textContent=p.ic||"🙂";b.append(d,p.nome);b.title="Da biblioteca de personagens";b.onclick=()=>addPers(p,1);g.appendChild(b)});
+ S.bib[sub].forEach(e=>{const b=el$("button"),im=new Image();im.src=e.img;im.draggable=false;im.style.cssText="width:34px;height:34px;object-fit:contain;display:block;margin:0 auto";
+  b.append(im,e.nome);b.onclick=()=>place(sub,{img:e.img,nome:e.nome});
+  b.oncontextmenu=ev=>{ev.preventDefault();if(confirm("Remover \""+e.nome+"\" da biblioteca?")){S.bib[sub]=S.bib[sub].filter(y=>y!==e);subUI();autosave()}};g.appendChild(b)})}
+document.querySelectorAll("#sub button").forEach(b=>b.onclick=()=>{sub=b.dataset.sub;subUI()});
+$("bXImg").onclick=()=>$("fXImg").click();
+$("fXImg").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f&&sub!=="obj")shrink(f,256,true,u=>{S.bib[sub].push({id:S.prox++,nome:f.name.replace(/\.[^.]+$/,"").slice(0,24),img:u});subUI();autosave()})};
+
+/* zoom flutuante e atalhos */
+$("zfm").onclick=()=>setZoom(S.zoom-.25);$("zfp").onclick=()=>setZoom(S.zoom+.25);$("zff").onclick=fit;
+function delSel(){const sc=curScene();if(sel){S.tokens=S.tokens.filter(x=>x.id!==sel);sel=null}else if(selO){sc.objs=sc.objs.filter(x=>x.id!==selO);selO=null}render();autosave()}
+function dupSel(){const t=cur(),o=co(),sc=curScene();if(t){const n=Object.assign({},t,{id:S.prox++,nome:t.nome+" (cópia)",x:Math.min(sc.w-S.grade,t.x+S.grade),y:t.y});S.tokens.push(n);sel=n.id}
+ else if(o){const n=Object.assign({},o,{id:S.prox++,x:o.x+S.grade,y:o.y+S.grade});sc.objs.push(n);selO=n.id}render();autosave()}
+document.addEventListener("keydown",e=>{const a=document.activeElement,tg=a&&(a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT"||a.isContentEditable);
+ if(e.key==="Escape"){if(arm){arm=null;$("vp").classList.remove("arm");status("");subUI();return}if(tg)a.blur();else if(sel||selO){sel=selO=null;render()}return}
+ if(tg||e.metaKey||e.altKey||(e.ctrlKey&&e.key.toLowerCase()!=="d"))return;
+ const t=cur(),o=co(),g=S.grade,k=e.key,m=t||o,sc=curScene();
+ if(k==="/"){e.preventDefault();setTab("chat");$("msg").focus()}
+ else if(k==="+"||k==="="){setZoom(S.zoom+.25)}else if(k==="-"){setZoom(S.zoom-.25)}else if(k==="0"){setZoom(1)}
+ else if(k==="f"||k==="F"){fit()}else if(k==="n"||k==="N"){nextTurn()}
+ else if(k==="Delete"||k==="Backspace"){if(m){e.preventDefault();delSel()}}
+ else if((k==="d"||k==="D")&&e.ctrlKey){e.preventDefault();if(m)dupSel()}
+ else if((k==="r"||k==="R")&&o){o.rot=((o.rot||0)+45)%360;render();autosave()}
+ else if(k.indexOf("Arrow")===0&&m){e.preventDefault();const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[k],sz=t?t.tam*g:g;
+  m.x=Math.max(0,Math.min(sc.w-sz,m.x+d[0]*g));m.y=Math.max(0,Math.min(sc.h-sz,m.y+d[1]*g));render();autosave()}});
+
+var arm=null;
+const CO={fundo:0,cenario:1,tokens:2},CAMS=[["fundo","Fundo"],["cenario","Cenário"],["tokens","Tokens"]];
+const cm=o=>S.cam[o.cam]||S.cam.cenario;
+function layerObjs(){const sc=curScene();return sc.objs.filter(o=>cm(o).v).sort((a,b)=>(CO[a.cam]??1)-(CO[b.cam]??1))}
+function camUI(){const b=$("camBox");b.innerHTML="";CAMS.forEach(([k,n])=>{const c=S.cam[k],r=el$("div","fld"),row=el$("div","row"),v=el$("button",0,c.v?"👁":"🚫"),l=el$("button",0,c.t?"🔒":"🔓");
+ v.title="Mostrar ou ocultar";l.title="Travar ou destravar";
+ v.onclick=()=>{c.v=!c.v;sel=selO=null;render();autosave()};l.onclick=()=>{c.t=!c.t;sel=selO=null;render();autosave()};
+ row.append(v,l);r.append(el$("span",0,n+(c.v?"":" (oculta)")+(c.t?" · travada":"")),row);b.appendChild(r)})}
+$("oCam").onchange=e=>{const o=co();if(o){o.cam=e.target.value;sel=selO=null;render();autosave()}};
+
+const T=(id,nome,cat,w,h,cam,b)=>({id,nome,cat,w,h,cam,b});
+const ST="#7d7d85",SK="#2e2e33",WD="#8b5a2b",WK="#3b2410";
+const STAMPS=[
+T("parede","Parede","Masmorra",3,1,"cenario",`<rect x="4" y="22" width="292" height="56" rx="5" fill="${ST}" stroke="${SK}" stroke-width="6"/><path d="M4 50H296M64 22V50M154 22V50M244 22V50M109 50V78M199 50V78" stroke="${SK}" stroke-width="4" fill="none"/>`),
+T("canto","Canto de Caverna","Masmorra",1,1,"cenario",`<path d="M4 22H78V96H22V78H4Z" fill="${ST}" stroke="${SK}" stroke-width="6" stroke-linejoin="round"/><path d="M4 50H78M40 22V50M50 50V96" stroke="${SK}" stroke-width="4"/>`),
+T("quebrada","Parede quebrada","Masmorra",3,1,"cenario",`<path d="M4 22H120L96 48L122 78H4Z" fill="${ST}" stroke="${SK}" stroke-width="6" stroke-linejoin="round"/><path d="M296 22H190L212 50L184 78H296Z" fill="${ST}" stroke="${SK}" stroke-width="6" stroke-linejoin="round"/><circle cx="150" cy="60" r="10" fill="#9a9aa2" stroke="${SK}" stroke-width="3"/><circle cx="140" cy="40" r="6" fill="#9a9aa2" stroke="${SK}" stroke-width="3"/><circle cx="166" cy="68" r="8" fill="#9a9aa2" stroke="${SK}" stroke-width="3"/>`),
+T("porta","Porta","Masmorra",1,1,"cenario",`<rect x="0" y="30" width="100" height="40" fill="${ST}" stroke="${SK}" stroke-width="5"/><rect x="22" y="22" width="56" height="56" rx="4" fill="${WD}" stroke="${WK}" stroke-width="5"/><path d="M50 22V78" stroke="${WK}" stroke-width="4"/><circle cx="62" cy="50" r="4" fill="#e0b84a"/>`),
+T("portaab","Porta aberta","Masmorra",1,1,"cenario",`<rect x="0" y="30" width="100" height="40" fill="${ST}" stroke="${SK}" stroke-width="5"/><rect x="20" y="30" width="60" height="40" fill="#222"/><rect x="18" y="4" width="10" height="46" fill="${WD}" stroke="${WK}" stroke-width="3"/>`),
+T("escada","Escada","Masmorra",1,1,"cenario",`<rect x="14" y="10" width="72" height="80" fill="#8a8a92" stroke="${SK}" stroke-width="5"/><path d="M14 26H86M14 42H86M14 58H86M14 74H86" stroke="${SK}" stroke-width="4"/>`),
+T("armadilha","Armadilha","Masmorra",1,1,"cenario",`<circle cx="50" cy="50" r="38" fill="#4a4a4f" stroke="${SK}" stroke-width="5"/><path d="M50 22L58 44H42Z M78 50L56 58V42Z M50 78L42 56H58Z M22 50L44 42V58Z" fill="#c9c9d1"/>`),
+T("buraco","Buraco","Masmorra",1,1,"fundo",`<ellipse cx="50" cy="50" rx="42" ry="38" fill="#5a4632"/><ellipse cx="50" cy="52" rx="34" ry="30" fill="#111"/><ellipse cx="46" cy="48" rx="20" ry="16" fill="#000"/>`),
+T("bau","Baú","Masmorra",1,1,"cenario",`<rect x="12" y="30" width="76" height="46" rx="6" fill="${WD}" stroke="${WK}" stroke-width="5"/><path d="M12 50H88" stroke="${WK}" stroke-width="4"/><rect x="42" y="44" width="16" height="16" rx="3" fill="#e0b84a" stroke="#7a5a10" stroke-width="3"/>`),
+
+T("p_rocha","Parede de rocha","Caverna",3,1,"cenario",`<path d="M2 30 Q 30 10, 75 30 T 150 25 T 225 35 T 298 25 L 298 90 L 2 90 Z" fill="#3a322c" stroke="#1f1a16" stroke-width="5"/><circle cx="50" cy="55" r="8" fill="#26201b"/><circle cx="150" cy="60" r="12" fill="#26201b"/><circle cx="240" cy="50" r="10" fill="#26201b"/>`),
+T("p_cantocaverna","Canto de Caverna","Caverna",1,1,"cenario",`<path d="M2 15 Q 20 5, 45 15 L 90 65 Q 80 85, 60 90 L 2 90 Z" fill="#3a322c" stroke="#1f1a16" stroke-width="5"/><path d="M2 15 L 15 90" stroke="#26201b" stroke-width="4"/>`),
+T("estalagmite","Estalagmite","Caverna",1,1,"cenario",`<path d="M50 10 Q 62 60, 75 90 L 25 90 Q 38 60, 50 10 Z" fill="#6c635b" stroke="#3d3732" stroke-width="4"/>`),
+T("cristal","Cristal Mágico","Caverna",1,1,"cenario",`<polygon points="50,10 75,40 65,90 35,90 25,40" fill="#3bc5d9" stroke="#1c6b78" stroke-width="4"/><polygon points="50,10 60,40 50,90 50,10" fill="#8ef3ff" opacity=".6"/>`),
+T("poça_acido","Poça de Ácido","Caverna",1,1,"fundo",`<ellipse cx="50" cy="50" rx="42" ry="34" fill="#58d93b" stroke="#256617" stroke-width="4"/><ellipse cx="45" cy="48" rx="22" ry="16" fill="#8cf576" opacity=".7"/>`),
+T("teia","Teia de Aranha","Caverna",1,1,"cenario",`<path d="M10 10 L 90 90 M90 10 L 10 90 M50 10 V 90 M10 50 H 90" stroke="#e0e0e0" stroke-width="3" fill="none"/><circle cx="50" cy="50" r="25" stroke="#e0e0e0" stroke-width="2" fill="none"/><circle cx="50" cy="50" r="10" stroke="#e0e0e0" stroke-width="2" fill="none"/>`),
+T("ossada","Crânio e Ossos","Caverna",1,1,"cenario",`<circle cx="45" cy="45" r="12" fill="#dedede" stroke="#555" stroke-width="3"/><path d="M35 65 L 75 55 M55 75 L 65 35" stroke="#dedede" stroke-width="5" stroke-linecap="round"/>`),
+
+T("pedra","Piso de pedra","Pisos",1,1,"fundo",`<rect width="100" height="100" fill="#9a9aa2"/><path d="M0 50H100M50 0V50M25 50V100M75 50V100" stroke="#6a6a72" stroke-width="4"/>`),
+T("madeira","Piso de madeira","Pisos",1,1,"fundo",`<rect width="100" height="100" fill="#a8743a"/><path d="M0 25H100M0 50H100M0 75H100M30 0V25M70 25V50M20 50V75M60 75V100" stroke="#6b4521" stroke-width="3"/>`),
+T("piso_terra","Piso de Terra Batida","Pisos",1,1,"fundo",`<rect width="100" height="100" fill="#785a3c"/><path d="M15 20 Q 30 10, 45 25 T 80 20 M20 70 Q 40 85, 60 70 T 85 80" stroke="#5c4228" stroke-width="3" fill="none" opacity=".7"/>`),
+T("piso_caverna","Piso de Caverna","Pisos",1,1,"fundo",`<rect width="100" height="100" fill="#38302b"/><circle cx="25" cy="30" r="8" fill="#2b2420"/><circle cx="70" cy="75" r="12" fill="#2b2420"/><circle cx="80" cy="25" r="6" fill="#2b2420"/>`),
+T("agua","Água","Pisos",1,1,"fundo",`<rect width="100" height="100" fill="#3b8bd9" opacity=".75"/><path d="M10 30Q25 20 40 30T70 30M20 60Q35 50 50 60T90 60" stroke="#fff" stroke-width="4" fill="none" opacity=".6"/>`),
+T("grama","Grama / Campo","Pisos",1,1,"fundo",`<rect width="100" height="100" fill="#4c8c4a"/><path d="M15 85 L15 65 M35 90 L35 70 M65 85 L65 60 M85 90 L85 68" stroke="#326130" stroke-width="4" stroke-linecap="round"/>`),
+T("lava","Lava / Magma","Pisos",1,1,"fundo",`<rect width="100" height="100" fill="#d9531e"/><path d="M10 40 Q 30 10, 50 40 T 90 40" stroke="#ffeb3b" stroke-width="6" fill="none"/><path d="M20 80 Q 40 60, 60 80 T 90 70" stroke="#ffeb3b" stroke-width="4" fill="none"/>`),
+T("tapete","Tapete Vermelho","Pisos",2,1,"fundo",`<rect x="4" y="12" width="192" height="76" rx="6" fill="#a83a3a" stroke="#e0b84a" stroke-width="6"/><rect x="20" y="28" width="160" height="44" fill="none" stroke="#e0b84a" stroke-width="3"/>`),
+T("tapetered","Tapete Redondo Nobre","Pisos",2,2,"fundo",`<circle cx="100" cy="100" r="90" fill="#801b31" stroke="#d4af37" stroke-width="6"/><circle cx="100" cy="100" r="65" fill="none" stroke="#d4af37" stroke-width="3" stroke-dasharray="8 6"/>`),
+
+T("mesa","Mesa de Taverna","Interiores",2,1,"cenario",`<rect x="6" y="20" width="188" height="60" rx="8" fill="#7a4a22" stroke="#3d220f" stroke-width="5"/><rect x="18" y="12" width="20" height="76" fill="#593418"/><rect x="162" y="12" width="20" height="76" fill="#593418"/>`),
+T("mesagrande","Mesa Grande de Banquete","Interiores",3,1,"cenario",`<rect x="6" y="20" width="288" height="60" rx="8" fill="#7a4a22" stroke="#3d220f" stroke-width="5"/><rect x="24" y="12" width="22" height="76" fill="#593418"/><rect x="139" y="12" width="22" height="76" fill="#593418"/><rect x="254" y="12" width="22" height="76" fill="#593418"/>`),
+T("mesaredonda","Mesa Redonda Social","Interiores",2,2,"cenario",`<circle cx="100" cy="100" r="85" fill="#7a4a22" stroke="#3d220f" stroke-width="6"/><circle cx="100" cy="100" r="50" fill="none" stroke="#593418" stroke-width="4"/>`),
+T("cadeira","Cadeira","Interiores",1,1,"cenario",`<rect x="25" y="25" width="50" height="50" rx="6" fill="#7a4a22" stroke="#3d220f" stroke-width="4"/><rect x="25" y="15" width="50" height="18" rx="4" fill="#593418"/>`),
+T("cadeiranobre","Cadeira de Nobre","Interiores",1,1,"cenario",`<rect x="20" y="20" width="60" height="60" rx="8" fill="#591c28" stroke="#d4af37" stroke-width="4"/><path d="M20 20 L 50 2 L 80 20 Z" fill="#702434" stroke="#d4af37" stroke-width="4"/>`),
+T("trono","Trono Imponente","Interiores",2,2,"cenario",`<rect x="20" y="15" width="160" height="170" rx="16" fill="#42141f" stroke="#d4af37" stroke-width="6"/><path d="M20 50 L 100 5 L 180 50 Z" fill="#611d2c" stroke="#d4af37" stroke-width="6"/><rect x="35" y="80" width="130" height="90" rx="10" fill="#801b31" stroke="#d4af37" stroke-width="4"/>`),
+T("cama","Cama / Beliche","Interiores",2,1,"cenario",`<rect x="6" y="10" width="188" height="80" rx="6" fill="#8c6747" stroke="#4a331f" stroke-width="5"/><rect x="16" y="18" width="50" height="64" rx="6" fill="#f0e6d2"/><rect x="140" y="18" width="44" height="64" rx="4" fill="#3b6ea5"/>`),
+T("estante","Estante de Livros","Interiores",2,1,"cenario",`<rect x="10" y="10" width="180" height="80" fill="#5e3818" stroke="#301c0c" stroke-width="5"/><line x1="10" y1="36" x2="190" y2="36" stroke="#301c0c" stroke-width="4"/><line x1="10" y1="68" x2="190" y2="68" stroke="#301c0c" stroke-width="4"/><rect x="20" y="16" width="14" height="18" fill="#a83a3a"/><rect x="36" y="16" width="10" height="18" fill="#3b6ea5"/><rect x="50" y="16" width="16" height="18" fill="#388a4e"/>`),
+T("lareira","Lareira Acesa","Interiores",2,2,"cenario",`<rect x="10" y="10" width="180" height="180" fill="#615751" stroke="#36302c" stroke-width="6"/><path d="M60 190 V 110 Q 100 80, 140 110 V 190 Z" fill="#1c1917"/><path d="M100 110 C 120 130, 110 170, 100 175 C 90 170, 80 130, 100 110 Z" fill="#ff7a00"/><path d="M100 135 C 108 145, 105 165, 100 170 C 95 165, 92 145, 100 135 Z" fill="#ffeb3b"/>`),
+T("barril","Barril de Cerveja","Interiores",1,1,"cenario",`<ellipse cx="50" cy="50" rx="35" ry="42" fill="#8c582d" stroke="#4a2d15" stroke-width="5"/><ellipse cx="50" cy="50" rx="22" ry="42" fill="none" stroke="#2b1a0c" stroke-width="4"/><line x1="20" y1="35" x2="80" y2="35" stroke="#111" stroke-width="4"/><line x1="15" y1="65" x2="85" y2="65" stroke="#111" stroke-width="4"/>`),
+T("barrilquebrado","Barril Quebrado","Interiores",1,1,"cenario",`<path d="M15 30 Q 50 15, 85 30 L 75 90 H 25 Z" fill="#6e4523" stroke="#3d2412" stroke-width="4"/><path d="M30 45 L 70 55 M40 70 L 65 65" stroke="#26170c" stroke-width="3"/><path d="M10 70 Q 20 60, 30 85 Z" fill="#523419"/>`),
+T("caixa","Caixa de Madeira","Interiores",1,1,"cenario",`<rect x="15" y="15" width="70" height="70" rx="6" fill="#8c6238" stroke="#4a311b" stroke-width="5"/><line x1="15" y1="15" x2="85" y2="85" stroke="#4a311b" stroke-width="4"/><line x1="85" y1="15" x2="15" y2="85" stroke="#4a311b" stroke-width="4"/>`),
+T("caixaquebrada","Caixas Quebradas","Interiores",1,1,"cenario",`<path d="M15 40 L 70 20 L 85 75 L 30 85 Z" fill="#7a5430" stroke="#422b15" stroke-width="4"/><path d="M40 30 L 80 50 M25 70 L 60 80" stroke="#382210" stroke-width="3"/><polygon points="65,15 90,30 75,55" fill="#664426" stroke="#422b15" stroke-width="3"/>`),
+
+T("mesamago","Mesa de Mago","Arcano",2,1,"cenario",`<rect x="6" y="20" width="188" height="60" rx="8" fill="#2d1c47" stroke="#140b21" stroke-width="5"/><circle cx="50" cy="50" r="16" fill="#522f8a" stroke="#d4af37" stroke-width="3"/><path d="M120 30 H 160 V 70 H 120 Z" fill="#e0d6c3" stroke="#8a795c" stroke-width="3"/><circle cx="100" cy="50" r="10" fill="#3bd9d1" stroke="#1c7872" stroke-width="3"/>`),
+T("circuloritual","Círculo de Rituais","Arcano",3,3,"cenario",`<circle cx="150" cy="150" r="135" fill="none" stroke="#9b2fc4" stroke-width="6"/><circle cx="150" cy="150" r="100" fill="none" stroke="#9b2fc4" stroke-width="4"/><polygon points="150,25 258,212 42,212" fill="none" stroke="#9b2fc4" stroke-width="4"/><circle cx="150" cy="150" r="18" fill="#d93b3b" stroke="#781c1c" stroke-width="4"/>`),
+T("livroscaidos","Pilha de Livros Caídos","Arcano",1,1,"cenario",`<rect x="20" y="30" width="60" height="20" rx="3" fill="#a83a3a" stroke="#521b1b" stroke-width="3" transform="rotate(-15 50 40)"/><rect x="25" y="50" width="55" height="18" rx="3" fill="#3b6ea5" stroke="#1c3552" stroke-width="3" transform="rotate(20 50 60)"/><rect x="30" y="65" width="50" height="16" rx="3" fill="#388a4e" stroke="#1a4024" stroke-width="3" transform="rotate(-5 55 70)"/>`),
+
+T("placapedidos","Placa de Pedidos","Vila",1,1,"cenario",`<rect x="46" y="10" width="8" height="80" fill="#5e3818" stroke="#301c0c" stroke-width="3"/><rect x="20" y="20" width="60" height="50" rx="4" fill="#d9c391" stroke="#665128" stroke-width="4"/><line x1="28" y1="35" x2="72" y2="35" stroke="#52401f" stroke-width="3"/><line x1="28" y1="48" x2="65" y2="48" stroke="#52401f" stroke-width="3"/><line x1="28" y1="61" x2="55" y2="61" stroke="#52401f" stroke-width="3"/>`),
+T("bigorna","Bigorna","Vila",1,1,"cenario",`<path d="M30 35 H 70 V 48 H 85 L 75 75 H 25 L 15 48 H 30 Z" fill="#3b3b42" stroke="#1f1f24" stroke-width="4"/><rect x="42" y="75" width="16" height="15" fill="#242429"/>`),
+T("barracavenda","Barraca de Vendas","Vila",2,2,"cenario",`<path d="M10 70 L 100 10 L 190 70 Z" fill="#a83a3a" stroke="#5e1b1b" stroke-width="5"/><rect x="20" y="70" width="160" height="110" fill="#e6d3a3" stroke="#8a6a3a" stroke-width="5"/><rect x="35" y="90" width="130" height="60" fill="#7a4a22" stroke="#3d220f" stroke-width="4"/>`),
+T("fonte","Fonte de Água","Vila",2,2,"cenario",`<circle cx="100" cy="100" r="85" fill="#52525c" stroke="#2e2e33" stroke-width="8"/><circle cx="100" cy="100" r="60" fill="#3b8bd9"/><circle cx="100" cy="100" r="22" fill="#787880" stroke="#3d3d42" stroke-width="5"/><path d="M100 65 V 100" stroke="#fff" stroke-width="5" stroke-linecap="round"/>`),
+
+T("portao","Portão de Cidade / Cerca","Exteriores",3,1,"cenario",`<rect x="2" y="25" width="296" height="50" fill="${WD}" stroke="${WK}" stroke-width="5"/><line x1="50" y1="15" x2="50" y2="85" stroke="${WK}" stroke-width="8"/><line x1="150" y1="15" x2="150" y2="85" stroke="${WK}" stroke-width="10"/><line x1="250" y1="15" x2="250" y2="85" stroke="${WK}" stroke-width="8"/>`),
+T("cerca","Cerca de Madeira","Exteriores",2,1,"cenario",`<rect x="2" y="35" width="196" height="30" fill="#8a5a2b" stroke="#4a2e16" stroke-width="4"/><line x1="30" y1="15" x2="30" y2="85" stroke="#4a2e16" stroke-width="8"/><line x1="170" y1="15" x2="170" y2="85" stroke="#4a2e16" stroke-width="8"/>`),
+T("poco","Poço de Água","Exteriores",1,1,"cenario",`<circle cx="50" cy="50" r="42" fill="#787878" stroke="#424242" stroke-width="5"/><circle cx="50" cy="50" r="28" fill="#1b4b75"/><path d="M25 22 V 12 H 75 V 22" fill="none" stroke="#5e3818" stroke-width="6"/><line x1="50" y1="12" x2="50" y2="88" stroke="#5e3818" stroke-width="4"/>`),
+T("carroca","Carroça de Viagem","Exteriores",2,2,"cenario",`<rect x="30" y="40" width="140" height="110" rx="12" fill="#8c582d" stroke="#422914" stroke-width="5"/><circle cx="50" cy="140" r="28" fill="none" stroke="#333" stroke-width="8"/><circle cx="150" cy="140" r="28" fill="none" stroke="#333" stroke-width="8"/>`),
+T("carruagem","Carruagem de Luxo","Exteriores",3,2,"cenario",`<rect x="20" y="25" width="260" height="120" rx="20" fill="#3b1f14" stroke="#d4af37" stroke-width="5"/><rect x="80" y="45" width="80" height="70" rx="8" fill="#3b8bd9" opacity=".8" stroke="#d4af37" stroke-width="3"/><circle cx="70" cy="135" r="32" fill="none" stroke="#1c1c1c" stroke-width="8"/><circle cx="230" cy="135" r="32" fill="none" stroke="#1c1c1c" stroke-width="8"/>`),
+T("barco","Barco de Pesca","Exteriores",2,1,"cenario",`<path d="M10 30 Q 50 100, 90 85 L 190 85 Q 150 10, 110 30 Z" fill="#8a5a2b" stroke="#3d220f" stroke-width="5"/><line x1="100" y1="20" x2="100" y2="85" stroke="#3d220f" stroke-width="5"/><polygon points="100,20 150,50 100,75" fill="#f5f0e6" stroke="#b0a28a" stroke-width="3"/>`),
+T("navio","Navio de Grande Porte","Exteriores",4,2,"cenario",`<path d="M10 50 Q 80 130, 190 120 L 370 120 Q 320 30, 260 50 Z" fill="#5e3818" stroke="#301c0c" stroke-width="6"/><rect x="100" y="30" width="18" height="90" fill="#301c0c"/><rect x="240" y="20" width="18" height="100" fill="#301c0c"/><polygon points="109,20 160,50 109,80" fill="#f5f0e6" stroke="#b0a28a" stroke-width="3"/><polygon points="249,10 310,40 249,70" fill="#f5f0e6" stroke="#b0a28a" stroke-width="3"/>`),
+T("ponte","Ponte de Madeira","Exteriores",2,2,"cenario",`<rect x="10" y="10" width="180" height="180" fill="#9c6633" stroke="#5e3818" stroke-width="6"/><line x1="10" y1="50" x2="190" y2="50" stroke="#3d220f" stroke-width="5"/><line x1="10" y1="150" x2="190" y2="150" stroke="#3d220f" stroke-width="5"/><line x1="50" y1="10" x2="50" y2="190" stroke="#5e3818" stroke-width="4"/><line x1="150" y1="10" x2="150" y2="190" stroke="#5e3818" stroke-width="4"/>`),
+
+T("arvore","Árvore Grande","Floresta",2,2,"cenario",`<circle cx="100" cy="100" r="88" fill="#2d6a30" stroke="#163818" stroke-width="6"/><circle cx="70" cy="70" r="45" fill="#388a3c" opacity=".5"/><circle cx="130" cy="120" r="50" fill="#1e4d20" opacity=".6"/><circle cx="100" cy="100" r="35" fill="#6b4423" stroke="#3d220f" stroke-width="4"/>`),
+T("arbusto","Arbusto Denso","Floresta",1,1,"cenario",`<circle cx="50" cy="55" r="40" fill="#388a3c" stroke="#1e4d20" stroke-width="5"/><circle cx="35" cy="45" r="24" fill="#4caf50"/><circle cx="65" cy="45" r="22" fill="#2e7d32"/>`),
+T("cogumelo","Cogumelo Gigante","Floresta",1,1,"cenario",`<path d="M42 50 V 90 H 58 V 50 Z" fill="#e0d6c3" stroke="#7a705e" stroke-width="4"/><path d="M12 50 Q 50 5, 88 50 Z" fill="#c73e3e" stroke="#751b1b" stroke-width="4"/><circle cx="35" cy="25" r="6" fill="#fff"/><circle cx="65" cy="28" r="5" fill="#fff"/><circle cx="50" cy="15" r="4" fill="#fff"/>`),
+
+T("areac","Área Circular (Raio)","Efeitos",3,3,"cenario",`<circle cx="150" cy="150" r="142" fill="#e74c3c" fill-opacity=".25" stroke="#e74c3c" stroke-width="6" stroke-dasharray="14 8"/>`),
+T("areaq","Área Quadrada (Cubo)","Efeitos",2,2,"cenario",`<rect x="4" y="4" width="192" height="192" fill="#3498db" fill-opacity=".25" stroke="#3498db" stroke-width="6" stroke-dasharray="14 8"/>`),
+T("areacone","Cone / Sopro","Efeitos",2,2,"cenario",`<path d="M10 190 L 190 10 L 190 190 Z" fill="#f39c12" fill-opacity=".3" stroke="#f39c12" stroke-width="6" stroke-linejoin="round"/>`),
+T("interr","Interrogação","Marcadores",1,1,"cenario",`<circle cx="50" cy="50" r="40" fill="#3b8bd9" stroke="#fff" stroke-width="5"/><text x="50" y="68" font-size="56" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="700">?</text>`),
+T("exclam","Exclamação","Marcadores",1,1,"cenario",`<circle cx="50" cy="50" r="40" fill="#c0392b" stroke="#fff" stroke-width="5"/><text x="50" y="68" font-size="56" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="700">!</text>`)
+];
+for(let i=1;i<=6;i++)STAMPS.push(T("n"+i,"Nº "+i,"Marcadores",1,1,"cenario",`<circle cx="50" cy="50" r="42" fill="#7a2fb0" stroke="#fff" stroke-width="6"/><text x="50" y="68" font-size="52" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="700">${i}</text>`));
+
+const STAMP={},SURL={};STAMPS.forEach(x=>STAMP[x.id]=x);
+function stampURL(x){return SURL[x.id]||(SURL[x.id]="data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+x.w*100+" "+x.h*100+'" preserveAspectRatio="none">'+x.b+"</svg>"))}
+function stampBg(el,o){const x=STAMP[o.st];if(x){el.style.backgroundImage='url("'+stampURL(x)+'")'}}
+function stampsUI(g){let cat="";
+ STAMPS.forEach(x=>{if(x.cat!==cat){cat=x.cat;const h=el$("h2",0,cat);h.style.cssText="grid-column:1/-1;margin:6px 0 0";g.appendChild(h)}
+  const b=el$("button"),im=new Image();im.src=stampURL(x);im.draggable=false;im.style.cssText="width:38px;height:38px;object-fit:contain;display:block;margin:0 auto";
+  if(arm&&arm.id===x.id)b.classList.add("p");b.append(im,x.nome);
+  b.onclick=()=>{arm=arm&&arm.id===x.id?null:x;$("vp").classList.toggle("arm",!!arm);status(arm?"Carimbo ativo: clique no mapa (Esc encerra)":"");subUI()};g.appendChild(b)});
+ const p=el$("p","mut","Escolha um carimbo e clique no mapa quantas vezes quiser. Esc encerra. No painel você pode escolher entre esticar a imagem ou repeti-la (tile).");p.style.gridColumn="1/-1";g.appendChild(p)}
+$("vp").addEventListener("pointerdown",e=>{if(!arm)return;const vp=$("vp"),R=vp.getBoundingClientRect(),g=S.grade,sc=curScene();
+ if(e.clientX-R.left>vp.clientWidth||e.clientY-R.top>vp.clientHeight)return;
+ e.preventDefault();e.stopPropagation();
+ let x=(e.clientX-R.left+vp.scrollLeft)/S.zoom-arm.w*g/2,y=(e.clientY-R.top+vp.scrollTop)/S.zoom-arm.h*g/2;
+ if(S.snap){x=Math.round(x/g)*g;y=Math.round(y/g)*g}
+ x=Math.max(0,Math.min(sc.w-g,x));y=Math.max(0,Math.min(sc.h-g,y));
+ const o={id:S.prox++,ic:"",img:null,repeat:"no-repeat",st:arm.id,x,y,w:arm.w,h:arm.h,rot:0,trava:false,cam:arm.cam};
+ sc.objs.push(o);selO=o.id;sel=null;render();autosave()},true);
+
+/* biblioteca de personagens e barra do jogador */
+function pbarUpdate(t){const im=$("pbImg"),f=$("pbBar").firstElementChild,r=t.pvmax>0?Math.max(0,Math.min(1,t.pv/t.pvmax)):0;
+ $("pbNm").textContent=t.nome;im.style.backgroundImage=t.img?"url("+t.img+")":"none";im.textContent=t.img?"":(t.ic||"🙂");
+ f.style.width=r*100+"%";f.style.background=r>.5?"linear-gradient(#7be08f,#2f9e4f)":r>.25?"linear-gradient(#ffe28a,#d9a441)":"linear-gradient(#ff8a7a,#c0392b)";
+ $("pbHp").textContent=t.pvmax>0?"PV "+t.pv+" / "+t.pvmax:"PV —"}
+function persSnap(t,g){const f=S.fichas.find(x=>x.id==t.ficha);
+ return{id:S.prox++,nome:t.nome.replace(/ \d+$/,""),grupo:g,img:t.img||null,fig:t.fig||null,ic:t.ic||"",forma:t.forma||"circulo",cor:t.cor||null,tam:t.tam,pvmax:t.pvmax>0?t.pvmax:null,ficha:f?{nome:f.nome,campos:Object.assign({},f.campos),mh:f.mh?JSON.parse(JSON.stringify(f.mh)):undefined}:null}}
+function addPers(p,qty){qty=Math.max(1,Math.min(20,qty||1));const c=ctr(),g=S.grade,tam=p.tam||1,sc=curScene();
+ const ex=S.tokens.filter(t=>t.nome===p.nome||t.nome.indexOf(p.nome+" ")===0).length;let last=null;
+ for(let i=0;i<qty;i++){const id=S.prox++;let fid=null;
+  if(p.ficha){fid=S.prox++;S.fichas.push({id:fid,nome:p.ficha.nome,campos:Object.assign({},p.ficha.campos),mh:p.ficha.mh?JSON.parse(JSON.stringify(p.ficha.mh)):undefined})}
+  S.tokens.push({id,nome:ex===0&&qty===1?p.nome:p.nome+" "+(ex+i+1),x:Math.max(0,Math.min(sc.w-g*tam,c.x+(i%5)*g)),y:Math.max(0,Math.min(sc.h-g*tam,c.y+Math.floor(i/5)*g)),tam,img:p.img||null,fig:p.fig||null,ic:p.ic||"",forma:p.forma||"circulo",cor:p.cor||undefined,pv:p.pvmax,pvmax:p.pvmax,ficha:fid,dead:false});last=id}
+ sel=last;selO=null;render();autosave()}
+function persUI(){const l=$("pList"),f=$("pFil").value;l.innerHTML="";const list=S.pers.filter(p=>!f||p.grupo===f);
+ list.forEach(p=>{const r=el$("div","pc"),im=el$("div","pci"),tx=el$("div","pct");
+  if(p.img)im.style.backgroundImage="url("+p.img+")";else im.textContent=p.ic||"🙂";
+  tx.append(el$("b",0,p.nome),el$("span","mut",p.grupo+(p.pvmax?" · PV "+p.pvmax:"")+(p.ficha?" · ficha":"")));
+  const add=el$("button","p","+ Mapa"),up=el$("button",0,"↻"),x=el$("button",0,"×");
+  add.onclick=()=>addPers(p,+$("pQtd").value||1);
+  up.title="Atualizar com o token selecionado";up.onclick=()=>{const t=cur();if(!t)return status("Selecione um token.");const n=persSnap(t,p.grupo);n.id=p.id;n.nome=p.nome;Object.assign(p,n);persUI();autosave()};
+  x.title="Remover da biblioteca";x.onclick=()=>{if(confirm("Remover \""+p.nome+"\" da biblioteca?")){S.pers=S.pers.filter(y=>y!==p);persUI();subUI();autosave()}};
+  r.append(im,tx,add,up,x);l.appendChild(r)});
+ if(!list.length)l.appendChild(el$("p","mut","Nenhum personagem salvo neste grupo."))}
+$("pFil").onchange=persUI;
+$("pSave").onclick=()=>{const t=cur();if(!t)return status("Selecione um token no mapa primeiro.");S.pers.push(persSnap(t,$("pGrp").value));persUI();subUI();autosave()};
+$("pImp").onclick=()=>$("fPImg").click();
+$("fPImg").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)shrink(f,256,true,u=>{S.pers.push({id:S.prox++,nome:f.name.replace(/\.[^.]+$/,"").slice(0,24),grupo:$("pGrp").value,img:u,fig:null,ic:"",forma:"circulo",cor:null,tam:1,pvmax:null,ficha:null,dead:false});persUI();subUI();autosave()})};
+$("pExp").onclick=async()=>{const txt=JSON.stringify({app:"mesa-virtual-personagens",pers:S.pers}),name="personagens.json";
+ try{if(window.claude&&claude.use){const d=await claude.use("downloads");if(d){await d.save({filename:name,data:txt});return}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"}));a.download=name;a.click()}catch(e){if(!e||e.code!=="declined")status("Não foi possível exportar aqui.")}};
+$("pLoad").onclick=()=>$("fPLib").click();
+$("fPLib").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const j=JSON.parse(r.result);if(!j||!Array.isArray(j.pers))throw 0;j.pers.forEach(p=>{if(p&&p.nome)S.pers.push(Object.assign({tam:1,forma:"circulo",grupo:"NPCs"},p,{id:S.prox++}))});persUI();subUI();autosave();status("Biblioteca importada ✓")}catch(err){status("Arquivo de biblioteca inválido.")}};r.readAsText(f)};
+
+/* Mouse House e fichas */
+const ATRS=["Força","Inteligência","Resistência","Agilidade"];
+const RACAS={"Rato":{e:"🐭",at:{n:"Ligeiro como um rato",d:"esquiva garantida quando a vida cai para metade da vida base (2 turnos, 1 de recarga)"},ps:[["Mania de rato","+2 de destreza em ações de roubo dentro de combate"],["Olha como eu sou fraco","sai de brigas sem ser percebido; +2 de iniciativa em combate"]]},
+"Lagarto":{e:"🦎",at:{n:"Troca de pele",d:"regenera 1d10 de vida (2 usos por combate)",auto:"heal"},ps:[["Me vê? Agora não vê mais","camufla-se em qualquer ambiente: +2 em destreza e +2 de dano nos ataques camuflados"],["Escalando 90º","escala muros e paredes altas"]]},
+"Morcego":{e:"🦇",at:{n:"Eco destruição",d:"grito estridente: o inimigo perde el turno"},ps:[["Nosferatu","+2 de força em intimidação; inimigos têm −2 na 1ª esquiva"],["Ecolocalização","+2 de inteligência em localização; pode revelar um inimigo escondido"]]},
+"Coelho":{e:"🐰",at:{n:"Ataque em frenesi",d:"ataca 2 vezes causando 2d de dano base",auto:"dmg2"},ps:[["Vou te pegar","+2 em destreza; pode se aproximar de inimigos distantes"],["Saco sem fundo","recupera 1d8 ao comer objetos (panos, cascas…)"]]},
+"Corvo":{e:"🐦",at:{n:"Inescapável",d:"impede a esquiva total do inimigo"},ps:[["Inalcançável","+2 de força em intimidação; 1ª esquiva parcial garantida em combate"],["Pilhador natural","+2 de destreza em roubo e furtividade"]]},
+"Pardal":{e:"🐤",at:{n:"Ignorar dano",d:"ignora 1d6 do dano recebido (2 usos por combate)",auto:"red"},ps:[["Indo à Roma","+2 em barganha e presença"],["Charme natural","+2 em sedução; em combate pode convencer o inimigo a desistir"]]},
+"Pato":{e:"🦆",at:{n:"Desarmar",d:"desarma um inimigo durante o combate"},ps:[["Arrogância","+2 em barganha"],["Multiutilidades","+2 de destreza em roubo e percepção"]]}};
+const ANT={"Mercenário":{tp:"dano",r:"contratado para a missão",d:"contratado para cumprir a missão. 1x por combate: +1d6 no dano do ataque."},"Envolvido":{tp:"acao",r:"diretamente envolvido na trama",d:"diretamente envolvido na trama. 1x por combate: +1d6 na rolagem de ação (d12)."},"Enviado":{tp:"esq",r:"enviado por obrigação",d:"na missão por obrigação. 1x por combate: +1d6 na esquiva."},"Acaso":{tp:"hab",r:"entrou na missão por acaso",d:"entrou na missão por acidente. 1x por combate: +1d6 no dano da habilidade."}};
+const TIT={"Veterano de aluguel":"mercenário com princípios, boa pessoa (mal/neutro)","Lobo de sangue":"aceita trabalhos sem questionar (mal)","Cavaleiro errante":"vive além das leis, livre e rebelde (neutro/caótico)","Coração entrelaçado":"empático e confiável (bom)","Vínculo vivo":"sensato, com malícia natural (bom/neutro)","Lâmina indomada":"espírito livre, revolucionário (bom/caótico)"};
+const CLASSES={"Espadachim":{p:["espada","machado"],n:"lanças e bastões"},"Lenhador":{p:["machado","espada"],n:"arcos e luvas"},"Assassino":{p:["faca","arco"],n:"espadas e lanças"},"Arqueiro":{p:["arco","faca"],n:"machados e espadas"},"Lutador":{p:["luvas","faca"],n:"lanças e arcos"},"Lanceiro":{p:["lança","bastão"],n:"facas e machados"},"Mago":{p:["bastão","lança"],n:"espadas e facas"}};
+const MET=["bronze","ferro","aço","aço refinado"],MAD=["Angelim","Jatobá","Ipê","Ipê encantado"],V4=[2,3,4,5];
+const ARM={espada:{n:"Espada",q:MET.concat("madeira/outro"),v:V4.concat(1)},machado:{n:"Machado",q:MET,v:V4},"lança":{n:"Lança",q:MET,v:V4},faca:{n:"Faca",q:MET,v:V4},arco:{n:"Arco",q:MAD,v:V4},"bastão":{n:"Bastão",q:MAD,v:V4},luvas:{n:"Luvas",q:["pano","couro","aço","aço refinado"],v:V4},talheres:{n:"Talheres",q:["comum"],v:[1]},garra:{n:"Garra quebrada",q:["comum"],v:[1]},taco:{n:"Taco",q:["comum"],v:[1]}};
+const EVO={espada:"Espada longa",machado:"Machado arremessável",faca:"Faca arremessável",arco:"Besta",luvas:"Garras","lança":"Lança arremessável"},MEVO={"Fogo":"Tornado de fogo","Água":"Tempestade escaldante","Vento":"Onda elétrica"};
+const ARM0={};Object.keys(CLASSES).forEach(k=>ARM0[k]={t:CLASSES[k].p[0],q:0,evol:false});
+const ITENS=["Garrafa","Frutas","Chaves","Gazuas","Tochas","Documentos","Pergaminhos"],CONSUM=["Garrafa","Frutas","Gazuas"];
+const F10=["Erro crítico (falha desastrosa)","Erro","Acerto","Acerto bom","Acerto ótimo"],F12=["Erro crítico","Erro","Acerto","Bom acerto","Acerto ótimo","Acerto crítico"];
+const XPT={curta:[50,70,90,110,130],media:[50,70,90,130,180]};
+const d=n=>1+Math.floor(Math.random()*n),vidaT=n=>[20,25,30,35,40,50][n-1],lvlB=n=>n<=2?1:n<=4?2:3,lvlO=n=>n<=3?6:8,dmgD=n=>n<=2?8:n<=4?10:12;
+const idx10=r=>Math.min(4,Math.floor((r-1)/2)),armaB=m=>{const a=m.arma;if(a.evol&&m.nivel>=4)return 4;const A=ARM[a.t];return A&&A.v[a.q]||0};
+
+function mhSyncCampos(f){f.campos=Object.assign({},f.mh.attr)}
+function mhSync(f){const m=f.mh,max=vidaT(m.nivel);m.pv=Math.max(0,Math.min(max,m.pv));S.tokens.forEach(t=>{if(t.ficha==f.id){t.pvmax=max;t.pv=m.pv}})}
+function mhNova(o){const n=o.nivel||1,f={id:S.prox++,nome:o.nome||"Novo personagem",campos:{},mh:{jog:"",raca:"Rato",nivel:n,classe:"Espadachim",antec:"Mercenário",titulo:"Veterano de aluguel",elem:"Fogo",arma:Object.assign({},ARM0.Espadachim),attr:{"Força":2,"Inteligência":1,"Resistência":-2,"Agilidade":-1},pv:vidaT(n),xp:0,modo:"curta",itens:[],resumo:"",acoes:3,esq:2,usos:2,rec:0,antUsado:false,useAnt:false,vant:false}};mhSyncCampos(f);return f}
+function mhCombate(f){const m=f.mh;m.acoes=3;m.esq=2;m.usos=2;m.rec=0;m.antUsado=false;m.useAnt=false}
+function mhTurno(t){const f=S.fichas.find(x=>x.id==t.ficha);if(f&&f.mh){f.mh.acoes=3;f.mh.rec=Math.max(0,f.mh.rec-1)}}
+function mhNivel(f,n){const m=f.mh,old=vidaT(m.nivel);m.nivel=n;m.pv+=vidaT(n)-old;if(n<4)m.arma.evol=false}
+function mhToken(f){const c=ctr(),id=S.prox++,m=f.mh;S.tokens.push({id,nome:f.nome,x:c.x,y:c.y,tam:1,img:null,ic:RACAS[m.raca].e,forma:"circulo",cor:"#3b8bd9",pv:m.pv,pvmax:vidaT(m.nivel),ficha:f.id,dead:false});sel=id;selO=null;render();autosave()}
+
+const say=(f,txt,cr)=>push({k:"m",q:f.nome,txt,cr:cr||0}),done=(f,txt,cr)=>{say(f,txt,cr);mhSync(f);autosave();render()};
+function antB(m,tp){const A=ANT[m.antec];if(m.useAnt&&!m.antUsado&&A&&A.tp===tp){m.antUsado=true;m.useAnt=false;return d(6)}return 0}
+function mhTeste(f,at){const m=f.mh,n=m.nivel,r=d(10),v=f.campos[at]||0,i=idx10(r);let b=0,bt="";
+ if(i===3){b=lvlB(n);bt=" +"+b}else if(i===4){b=d(lvlO(n));bt=" +"+b+" (1d"+lvlO(n)+")"}
+ const ve=m.vant?d(lvlO(n)):0,tot=r+v+b+ve;
+ push(doRoll(1,10,v+b+ve,0,f.nome+" · "+at));
+ say(f,"Teste de "+at+": 1d10 ["+r+"] "+(v>=0?"+":"")+v+" · "+F10[i]+bt+(ve?" · vantagem +"+ve:"")+" = "+tot,i===0?-1:i===4?1:0)}
+function mhAtq(f){const m=f.mh,n=m.nivel;if(m.acoes<1)return say(f,"Sem ações restantes neste turno.");m.acoes--;
+ const b=d(12),ex=antB(m,"acao"),r=Math.min(12,b+ex),i=Math.floor((r-1)/2);
+ push(doRoll(1,12,ex,0,f.nome+" · Ataque"));
+ let txt="Ataque: 1d12 ["+b+(ex?" +"+ex+" antecedente":"")+"] · "+F12[i];
+ if(i<=1)return done(f,txt+(i===0?" — perde a ação e sofre −1d6 ao ser atacado no próximo turno.":" — perde a ação."),-1);
+ let bonus=0;if(i===3){bonus=lvlB(n);txt+=" (+"+bonus+")"}if(i===4){bonus=d(lvlO(n));txt+=" (+"+bonus+")"}
+ const dd=dmgD(n),dr=d(dd),ab=armaB(m),ve=m.vant?d(lvlO(n)):0,an=antB(m,"dano");let dano=dr+ab+bonus+ve+an,det="1d"+dd+" ["+dr+"] + arma "+ab+(bonus?" + bônus "+bonus:"")+(ve?" + vantagem "+ve:"")+(an?" + antecedente "+an:"");
+ if(i===5){dano*=2;det+=" ×2 (crítico)"}done(f,txt+" · Dano: "+det+" = "+dano,i===5?1:0)}
+function mhEsq(f){const m=f.mh;if(m.esq<1)return say(f,"Sem esquivas restantes neste combate.");m.esq--;
+ const b=d(10),ex=antB(m,"esq"),r=Math.min(10,b+ex);
+ push(doRoll(1,10,ex,0,f.nome+" · Esquiva"));
+ done(f,"Esquiva: 1d10 ["+b+(ex?" +"+ex+" antecedente":"")+"] · "+(r>=5?"desviou! O dano é ignorado.":"falhou.")+" (restam "+m.esq+")",r>=5?1:-1)}
+function mhHab(f){const m=f.mh,a=RACAS[m.raca].at;if(m.acoes<2)return say(f,"A habilidade custa 2 ações.");if(m.usos<1)return say(f,"Sem usos da habilidade neste combate.");if(m.rec>0)return say(f,"Habilidade em recarga.");
+ m.acoes-=2;m.usos--;m.rec=1;let x=a.n+": "+a.d;
+ if(a.auto==="heal"){const h=d(10);m.pv+=h;x+=" → +"+h+" PV";push(doRoll(1,10,0,0,f.nome+" · Troca de Pele"))}
+ if(a.auto==="dmg2"){const dd=dmgD(m.nivel),r1=d(dd),r2=d(dd),an=antB(m,"hab"),ab=armaB(m);push(doRoll(2,dd,ab+an,0,f.nome+" · Frenesi"));x+=" → dano 2d"+dd+" ["+r1+", "+r2+"] + arma "+ab+(an?" + antecedente "+an:"")+" = "+(r1+r2+ab+an)}
+ if(a.auto==="red"){const rd=d(6);x+=" → ignora "+rd+" de dano";push(doRoll(1,6,0,0,f.nome+" · Ignorar dano"))}
+ done(f,x)}
+function mhCura(f,k){const m=f.mh,max=vidaT(m.nivel);let t,h;if(k==="santa"){h=max-m.pv;t="Água santa: recupera toda a vida"}else{const c={dormir:["Dormir",8],comer:["Comer",6],agua:["Beber água",10]}[k];h=d(c[1]);t=c[0]+": +"+h+" PV (1d"+c[1]+")";push(doRoll(1,c[1],0,0,f.nome+" · Cura"))}
+ m.pv=Math.min(max,m.pv+h);done(f,t+" → "+m.pv+"/"+max)}
+function mhSobe(f){const m=f.mh,nd=m.nivel<6?XPT[m.modo][m.nivel-1]:null;if(!nd||m.xp<nd)return;m.xp-=nd;const g=vidaT(m.nivel+1)-vidaT(m.nivel);m.nivel++;m.pv+=g;done(f,"Subiu para o nível "+m.nivel+"! +"+g+" PV e +2 pontos de atributo para distribuir.",1)}
+
+const mkSel=(o,v,fn)=>{const e=document.createElement("select");o.forEach(x=>{const a=Array.isArray(x)?x:[x,x];e.appendChild(new Option(a[1],a[0]))});e.value=String(v);e.onchange=()=>fn(e.value);return e};
+const mkIn=(t,v,fn,w)=>{const e=document.createElement("input");e.type=t;e.value=v;if(w)e.style.width=w;e.onchange=()=>fn(e.value);return e};
+const mkCk=(t,v,fn,dis)=>{const l=el$("label","ck"),i=document.createElement("input");i.type="checkbox";i.checked=!!v;i.disabled=!!dis;i.onchange=()=>fn(i.checked);l.append(i," "+t);return l};
+const mkB=(t,fn,c)=>{const b=el$("button",c||0,t);b.onclick=fn;return b};
+const rw=(...c)=>{const r=el$("div","row");r.append(...c);return r};
+function mhUI(f,box){const m=f.mh,t=S.tokens.find(x=>x.ficha==f.id);if(t&&t.pvmax>0)m.pv=t.pv;
+ const R=RACAS[m.raca],C=CLASSES[m.classe],max=vidaT(m.nivel),go=()=>{mhSync(f);autosave();render()},H=x=>box.appendChild(el$("div","mhh",x)),P=x=>{const e=el$("p","mut",x);box.appendChild(e)};
+ box.appendChild(el$("strong",0,"Ficha Mouse House"));
+ H("Identidade");
+ box.append(el$("label",0,"Jogador"),mkIn("text",m.jog,v=>{m.jog=v;autosave()}),el$("label",0,"Personagem"),mkIn("text",f.nome,v=>{f.nome=v;go()}));
+ box.append(el$("label",0,"Raça · Nível"),rw(mkSel(Object.keys(RACAS),m.raca,v=>{m.raca=v;go()}),mkSel([1,2,3,4,5,6],m.nivel,v=>{mhNivel(f,+v);go()})));
+ box.append(el$("label",0,"Classe"),mkSel(Object.keys(CLASSES),m.classe,v=>{m.classe=v;m.arma=Object.assign({},ARM0[v]);go()}));
+ P("Pode usar: "+C.p.map(k=>ARM[k].n.toLowerCase()).join(" e ")+" · Não usa: "+C.n);
+ box.append(el$("label",0,"Antecedente"),mkSel(Object.keys(ANT),m.antec,v=>{m.antec=v;go()}));P(ANT[m.antec].d);
+ box.append(el$("label",0,"Título"),mkSel(Object.keys(TIT),m.titulo,v=>{m.titulo=v;autosave()}));P(TIT[m.titulo]);
+ H("Vida e progressão");
+ box.append(rw(el$("span",0,"Vida"),mkIn("number",m.pv,v=>{m.pv=+v||0;go()}),el$("span",0,"/ "+max),el$("span","mut","· dano base d"+dmgD(m.nivel))));
+ box.append(rw(mkB("Dormir +1d8",()=>mhCura(f,"dormir")),mkB("Comer +1d6",()=>mhCura(f,"comer")),mkB("Água +1d10",()=>mhCura(f,"agua")),mkB("Água santa",()=>mhCura(f,"santa"))));
+ const nd=m.nivel<6?XPT[m.modo][m.nivel-1]:null;
+ box.append(rw(el$("span",0,"XP"),mkIn("number",m.xp,v=>{m.xp=Math.max(0,+v||0);go()}),el$("span",0,nd?"/ "+nd:"(nível máximo)"),mkSel([["curta","Campanha curta"],["media","Campanha média"]],m.modo,v=>{m.modo=v;go()})));
+ if(nd&&m.xp>=nd)box.append(rw(mkB("⬆ Subir de nível",()=>mhSobe(f),"g")));
+ H("Atributos");
+ const soma=ATRS.reduce((a,k)=>a+m.attr[k],0),livres=2*(m.nivel-1)-soma;
+ ATRS.forEach(k=>{const v=el$("b",0,(m.attr[k]>=0?"+":"")+m.attr[k]),r=rw(el$("span",0,k),mkB("−",()=>{m.attr[k]--;mhSyncCampos(f);go()}),v,mkB("+",()=>{m.attr[k]++;mhSyncCampos(f);go()}),mkB("Testar",()=>mhTeste(f,k),"p"));r.style.justifyContent="space-between";box.appendChild(r)});
+ P("Pontos de atributo para distribuir: "+livres+(livres<0?" (acima do esperado)":"")+" · esperado: soma "+2*(m.nivel-1));
+ H("Arma");
+ const tipos=C.p.concat(["talheres","garra","taco"]);if(tipos.indexOf(m.arma.t)<0)tipos.push(m.arma.t);const A=ARM[m.arma.t]||ARM.espada;
+ box.append(rw(mkSel(tipos.map(k=>[k,ARM[k].n]),m.arma.t,v=>{m.arma={t:v,q:0,evol:false};go()}),mkSel(A.q.map((x,i)=>[i,x+" (+"+A.v[i]+")"]),m.arma.q,v=>{m.arma.q=+v;go()})));
+ if(m.classe==="Mago")box.append(rw(el$("span",0,"Elemento"),mkSel(["Água","Fogo","Vento"],m.elem,v=>{m.elem=v;go()})));
+ const ev=m.classe==="Mago"?MEVO[m.elem]:EVO[m.arma.t];
+ if(ev)box.append(mkCk(ev+" (nível 4+): +4 de dano",m.arma.evol,v=>{m.arma.evol=v;go()},m.nivel<4));
+ P("Bônus de dano da arma: +"+armaB(m));
+ H("Combate");
+ box.append(rw(mkB("⚔️ Atacar (1)",()=>mhAtq(f),"p"),mkB("🛡️ Esquivar",()=>mhEsq(f)),mkB("✨ Habilidade (2)",()=>mhHab(f)),mkB("Agir (3)",()=>{if(m.acoes<3)return say(f,"Agir usa as 3 ações do turno.");m.acoes=0;done(f,"Agir (usa as 3 ações do turno)")})));
+ P("Ações: "+m.acoes+"/3 · Esquivas: "+m.esq+"/2 · Habilidade: "+m.usos+"/2 usos"+(m.rec>0?" (em recarga)":""));
+ box.append(mkCk("Vantagem (+1d"+lvlO(m.nivel)+")",m.vant,v=>{m.vant=v;autosave()}),mkCk("Usar bônus de antecedente (1x por combate)",m.useAnt,v=>{m.useAnt=v;autosave()},m.antUsado));
+ box.append(rw(mkB("🪙 Moeda d6",()=>{const r=d(6);say(f,"Moeda d6 ["+r+"]: "+(r>=4?"Sim":"Not"))}),mkB("Novo combate",()=>{mhCombate(f);go()})));
+ H("Habilidades da raça");
+ P("Ativa · "+R.at.n+": "+R.at.d);R.ps.forEach(x=>P("Passiva · "+x[0]+": "+x[1]));
+ H("Inventário");
+ m.itens.forEach(it=>{const r=rw(el$("span",0,it.n+" ×"+it.q));
+  if(CONSUM.indexOf(it.n)>=0)r.append(mkB("usar",()=>{it.q--;if(it.q<1)m.itens=m.itens.filter(y=>y!==it);go()}));
+  r.append(mkB("×",()=>{m.itens=m.itens.filter(y=>y!==it);go()}));box.appendChild(r)});
+ const ni=mkSel(ITENS,ITENS[0],()=>{});box.append(rw(ni,mkB("+ item",()=>{const o=m.itens.find(y=>y.n===ni.value);if(o)o.q++;else m.itens.push({n:ni.value,q:1});go()})));
+ H("Resumo");
+ box.append(mkIn("text",m.resumo,v=>{m.resumo=v;autosave()}));
+ box.append(rw(mkB("Criar token",()=>mhToken(f),"p"),mkB("Salvar no Elenco",()=>{S.pers.push({id:S.prox++,nome:f.nome,grupo:"Jogadores",img:null,fig:null,ic:R.e,forma:"circulo",cor:null,tam:1,pvmax:max,ficha:{nome:f.nome,campos:Object.assign({},f.campos),mh:JSON.parse(JSON.stringify(m))}});persUI();autosave()}),mkB("Exportar",()=>mhExp(f))))}
+async function mhExp(f){const txt=JSON.stringify({app:"mesa-virtual-ficha",nome:f.nome,mh:f.mh}),name=(f.nome||"ficha").replace(/[^\w-]+/g,"_")+".json";
+ try{if(window.claude&&claude.use){const dl=await claude.use("downloads");if(dl){await dl.save({filename:name,data:txt});return}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"}));a.download=name;a.click()}catch(e){if(!e||e.code!=="declined")status("Não foi possível exportar aqui.")}}
+
+const AT8=ATRS,ANTK=Object.keys(ANT),TITK=Object.keys(TIT),CLK=Object.keys(CLASSES),RAK=Object.keys(RACAS);
+const pick=(t,r)=>t[Math.floor((r-1)/2)];
+const N1=["Ka","Ro","Dra","Tha","Sera","Ly","Sel","Al","Dor","Mi","Bru","Ori"],N2=["el","vos","los","phin","ra","ene","ian","thar","ko","mina"],N3=["Rabo Curto","Pena Negra","Brasa","Orvalho","Garra Fina","Sombra","Tormenta","Pata Ligeira","Bigode","Folha Seca"];
+const nomeAleat=()=>N1[d(N1.length)-1]+N2[d(N2.length)-1]+" "+N3[d(N3.length)-1];
+function mhGerar(){const fis=$("gFis").checked,r14=()=>fis?d(10)+d(4):d(14),niv=+$("gNiv").value||d(6),f=mhNova({nivel:niv,nome:$("gNome").value.trim()||nomeAleat()}),m=f.mh,usados=[];
+ m.attr={"Força":0,"Inteligência":0,"Resistência":0,"Agilidade":0};
+ [2,1,-2,-1].forEach(v=>{let a;do{a=pick(AT8,d(8))}while(usados.indexOf(a)>=0);usados.push(a);m.attr[a]+=v});
+ for(let i=0;i<2*(niv-1);i++)m.attr[pick(AT8,d(8))]++;
+ m.antec=pick(ANTK,d(8));m.titulo=TITK[d(6)-1];m.classe=pick(CLK,r14());m.raca=pick(RAK,r14());
+ const it=pick(ITENS,r14());m.itens=[{n:it,q:1}];if(m.classe==="Mago")m.elem=pick(["Água","Fogo","Vento"],d(6));
+ m.arma=Object.assign({},ARM0[m.classe]);m.pv=vidaT(niv);
+ m.resumo=f.nome+", "+m.raca.toLowerCase()+" "+m.classe.toLowerCase()+" de nível "+niv+", "+ANT[m.antec].r+"; título: "+m.titulo+". Leva: "+it.toLowerCase()+".";
+ mhSyncCampos(f);S.fichas.push(f);fSel=f.id;
+ push({k:"m",q:"Gerador",txt:f.nome+": "+m.raca+" "+m.classe+(m.classe==="Mago"?" ("+m.elem+")":"")+", nível "+niv+", "+m.antec+", "+m.titulo+", item: "+it+"."});
+ render();autosave()}
+$("mhNova").onclick=()=>{const f=mhNova({});S.fichas.push(f);fSel=f.id;render();autosave()};
+$("mhGer").onclick=mhGerar;$("gRnd").onclick=()=>{$("gNome").value=nomeAleat()};
+
+autoload();
+updateSceneTabs();
+render();
+</script>
+</body>
+</html>
